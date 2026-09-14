@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Software supply chain control — ingress to production</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1F3;
+  --card:#FFFFFF;
+  --ink:#16222C;
+  --ink-soft:#546570;
+  --rule:#C8D2D8;
+  --live:#1C6B64;
+  --live-bg:#DCEAE8;
+  --build:#3A5FA8;
+  --build-bg:#DFE6F4;
+  --seam:#B57400;
+  --seam-bg:#FBEBC8;
+  --gap:#A33A2A;
+  --gap-bg:#F7E0DC;
+  --spine:#2B3B47;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#10181E; --card:#18232B; --ink:#E6ECEF; --ink-soft:#9AAAB4; --rule:#2C3A44;
+    --live:#5FBDB2; --live-bg:#17332F; --build:#8FAEE4; --build-bg:#1A2739;
+    --seam:#E3AE4A; --seam-bg:#332705; --gap:#E58C7A; --gap-bg:#341813; --spine:#C3D0D8;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#10181E; --card:#18232B; --ink:#E6ECEF; --ink-soft:#9AAAB4; --rule:#2C3A44;
+  --live:#5FBDB2; --live-bg:#17332F; --build:#8FAEE4; --build-bg:#1A2739;
+  --seam:#E3AE4A; --seam-bg:#332705; --gap:#E58C7A; --gap-bg:#341813; --spine:#C3D0D8;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.55}
+.wrap{max-width:1180px;margin:0 auto;padding:clamp(20px,4vw,56px) clamp(16px,4vw,40px) 80px}
+h1{font-size:clamp(1.65rem,4.2vw,2.6rem);line-height:1.15;font-weight:600;letter-spacing:-0.02em;margin:0 0 .5rem;max-width:22ch}
+h2{font-size:clamp(1.1rem,2.4vw,1.4rem);font-weight:600;letter-spacing:-0.01em;margin:0 0 .35rem}
+h3{font-size:1rem;font-weight:600;margin:0 0 .3rem}
+p{margin:0 0 1rem;max-width:68ch}
+.lede{color:var(--ink-soft);font-size:clamp(1rem,2vw,1.12rem);max-width:60ch}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+section{margin-top:clamp(40px,6vw,72px)}
+.sec-head{border-top:2px solid var(--ink);padding-top:.7rem;margin-bottom:1.4rem}
+.sec-head p{color:var(--ink-soft);margin:.2rem 0 0;font-size:.95rem}
+a{color:inherit;text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:2px}
+a:hover{text-decoration-color:currentColor}
+a:focus-visible{outline:2px solid var(--seam);outline-offset:2px}
+
+.vbanner{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;
+  background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:10px 13px;margin:0 0 1.3rem;font-size:.82rem;color:var(--ink-soft)}
+.vbanner strong{color:var(--ink);font-weight:600}
+
+.chain{display:grid;gap:10px;grid-template-columns:repeat(6,1fr);align-items:stretch}
+.stage{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:14px 12px 16px;position:relative;min-width:0}
+.stage .n{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-soft)}
+.stage h3{font-size:.98rem;margin-top:.15rem}
+.stage p{font-size:.82rem;color:var(--ink-soft);margin:0;max-width:none}
+.stage .scans{margin-top:9px;font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink);
+  border-top:1px dashed var(--rule);padding-top:7px;line-height:1.5}
+.stage[data-seam]::after{content:attr(data-seam);position:absolute;right:-16px;top:50%;transform:translateY(-50%);
+  background:var(--seam-bg);color:var(--seam);border:1px solid var(--seam);border-radius:2px;
+  font-family:"IBM Plex Mono",monospace;font-size:.62rem;padding:1px 4px;z-index:2;font-weight:500}
+@media (max-width:820px){
+  .chain{grid-template-columns:1fr 1fr}
+  .stage[data-seam]::after{position:static;transform:none;display:inline-block;margin-top:8px}
+}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:18px 0 0;padding:0;list-style:none;font-size:.82rem;color:var(--ink-soft)}
+.legend li{display:flex;align-items:center;gap:7px}
+.key{width:11px;height:11px;border-radius:2px;flex:none;border:1px solid}
+.key.live{background:var(--live-bg);border-color:var(--live)}
+.key.build{background:var(--build-bg);border-color:var(--build)}
+.key.seam{background:var(--seam-bg);border-color:var(--seam)}
+.key.gapk{background:var(--gap-bg);border-color:var(--gap)}
+.key.none{background:transparent;border-color:var(--rule)}
+
+.scroller{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:900px;font-size:.84rem}
+caption{text-align:left;padding:12px 14px;color:var(--ink-soft);font-size:.85rem;border-bottom:1px solid var(--rule)}
+th,td{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:10px 11px;vertical-align:top;text-align:left}
+thead th{font-weight:600;font-size:.8rem;background:var(--paper)}
+tbody th{font-weight:600;width:170px;background:var(--paper)}
+tbody th span{display:block;font-weight:400;color:var(--ink-soft);font-size:.76rem;margin-top:2px}
+td:last-child,th:last-child{border-right:0}
+td.live{background:var(--live-bg);box-shadow:inset 3px 0 0 var(--live)}
+td.build{background:var(--build-bg);box-shadow:inset 3px 0 0 var(--build)}
+td.seam{background:var(--seam-bg);box-shadow:inset 3px 0 0 var(--seam)}
+td.gapc{background:var(--gap-bg);box-shadow:inset 3px 0 0 var(--gap)}
+td.none{color:var(--ink-soft)}
+td .tag{display:block;font-family:"IBM Plex Mono",monospace;font-size:.68rem;margin-bottom:3px;color:var(--ink-soft)}
+code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--paper);padding:1px 4px;border-radius:2px}
+td code{background:transparent;padding:0}
+
+.spine{border:1px solid var(--rule);border-radius:3px;background:var(--card);overflow:hidden}
+.spine-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--spine);color:var(--paper);padding:11px 14px;font-size:.85rem}
+.spine-bar strong{font-weight:600}
+.spine-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+.spine-grid>div{padding:14px;border-right:1px solid var(--rule);border-top:1px solid var(--rule)}
+.spine-grid>div:last-child{border-right:0}
+.spine-grid p{font-size:.84rem;color:var(--ink-soft);margin:0;max-width:none}
+.lvl{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--seam);display:block;margin-bottom:3px}
+
+.seams{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+.seamcard{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--seam);border-radius:3px;padding:14px}
+.seamcard .id{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--seam)}
+.seamcard p{font-size:.86rem;color:var(--ink-soft);margin:.3rem 0 0;max-width:none}
+.seamcard .owner{margin-top:.6rem;font-size:.78rem;color:var(--ink)}
+.seamcard .threat{margin-top:.5rem;font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-soft)}
+
+.base{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.base>div{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:14px}
+.base p{font-size:.85rem;color:var(--ink-soft);margin:.25rem 0 0;max-width:none}
+
+.clock{background:var(--card);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.clock-row{display:grid;grid-template-columns:130px 1fr;border-top:1px solid var(--rule)}
+.clock-row:first-child{border-top:0}
+.clock-row>.t{padding:13px 14px;background:var(--paper);font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--ink)}
+.clock-row>.d{padding:13px 14px}
+.clock-row h3{font-size:.95rem}
+.clock-row p{font-size:.85rem;color:var(--ink-soft);margin:.2rem 0 0;max-width:none}
+@media (max-width:640px){.clock-row{grid-template-columns:1fr}.clock-row>.t{border-bottom:1px solid var(--rule)}}
+
+.note{background:var(--seam-bg);border:1px solid var(--seam);border-radius:3px;padding:13px 15px;margin-top:16px}
+.note p{margin:0;font-size:.87rem;max-width:none}
+.note strong{font-weight:600}
+footer{margin-top:64px;border-top:1px solid var(--rule);padding-top:14px;color:var(--ink-soft);font-size:.8rem}
+footer p{font-size:.8rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="mono" style="font-size:.78rem;color:var(--ink-soft);margin:0 0 .6rem">AppSec control — draft skeleton</p>
+  <h1>Software supply chain, ingress to production</h1>
+  <p class="lede">Six stages, seven control pillars, five scanning disciplines and a heterogeneous build estate. The control's job is the joins between them. SLSA is what makes those joins verifiable rather than asserted, and the CVE clock is what stops a verified artefact from staying verified forever.</p>
+  <div class="vbanner">
+    <span><strong>SLSA v1.2</strong> — approved 24 November 2025</span>
+    <span>Build track L0–L3 · Source track L1–L4</span>
+    <span>There is no Build L4</span>
+    <span>Build Environment and Dependency tracks are drafts</span>
+  </div>
+</header>
+
+<section>
+  <div class="sec-head">
+    <h2>The chain</h2>
+    <p>Scanning disciplines shown where each one actually runs. Boundaries between tooling domains marked S1–S5.</p>
+  </div>
+  <div class="chain">
+    <div class="stage" data-seam="S1"><span class="n">01</span><h3>Ingress</h3><p>External dependencies enter through one gated proxy. Nothing resolved direct from public registries.</p><p class="scans">SCA · licence · provenance</p></div>
+    <div class="stage"><span class="n">02</span><h3>Source</h3><p>Branch protection, signed commits, two-party review. Target Source L3, with L4 for tier-one.</p><p class="scans">SAST · secrets · IaC</p></div>
+    <div class="stage" data-seam="S2"><span class="n">03</span><h3>Build</h3><p>Hermetic build on an ephemeral runner. Provenance generated in the control plane or not at all.</p><p class="scans">SCA (resolved) · container</p></div>
+    <div class="stage" data-seam="S3"><span class="n">04</span><h3>Artefact</h3><p>Signed artefact, SBOM, scan attestations bound to one digest. Promotion gate issues the VSA.</p><p class="scans">MAST · image scan</p></div>
+    <div class="stage" data-seam="S4"><span class="n">05</span><h3>Deploy</h3><p>Admission verifies the VSA. Approval binds to digest. Same check on Linux, Windows, internal and external cloud.</p><p class="scans">DAST · config</p></div>
+    <div class="stage" data-seam="S5"><span class="n">06</span><h3>Runtime</h3><p>Continuous re-evaluation against new advisories, drift detection, remediation clocks running.</p><p class="scans">IAST · DAST · drift</p></div>
+  </div>
+  <ul class="legend">
+    <li><span class="key live"></span>Control in place</li>
+    <li><span class="key build"></span>Tooling being built</li>
+    <li><span class="key seam"></span>Boundary — AppSec owns the join</li>
+    <li><span class="key gapk"></span>Gap — no owner today</li>
+    <li><span class="key none"></span>Not applicable at this stage</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Control map</h2>
+    <p>Pillars down, stages across. Amber and red cells are the control's actual scope: the pillars stop at their own boundaries.</p>
+  </div>
+  <div class="scroller">
+  <table>
+    <caption>Pillar coverage by lifecycle stage. Scroll sideways for the full chain.</caption>
+    <thead>
+      <tr><th scope="col">Pillar</th><th scope="col">Ingress</th><th scope="col">Source</th><th scope="col">Build</th><th scope="col">Artefact</th><th scope="col">Deploy</th><th scope="col">Runtime</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Ingress<span>Artefact proxy</span></th>
+        <td class="live"><span class="tag">IN-1</span>Provenance, licence and SCA screening before caching</td>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">IN-2</span>Builds resolve only from the internal proxy</td>
+        <td class="none">—</td>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">IN-3</span>Cached package re-evaluation on new advisories</td>
+      </tr>
+      <tr>
+        <th scope="row">Network<span>Perimeter and egress</span></th>
+        <td class="live"><span class="tag">NW-1</span>Registry allow-list; direct public egress denied</td>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">NW-2</span>Runners network-isolated, no arbitrary egress</td>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">NW-3</span>Segmented deploy paths per environment and cloud</td>
+        <td class="live"><span class="tag">NW-4</span>Egress monitoring on running workloads</td>
+      </tr>
+      <tr>
+        <th scope="row">Software lifecycle<span>SDLC gates</span></th>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">SL-1</span>Branch protection, signed commits, two-party review</td>
+        <td class="live"><span class="tag">SL-2</span>Pipeline definition held in-repo and reviewed</td>
+        <td class="live"><span class="tag">SL-3</span>Scan gates before promotion</td>
+        <td class="live"><span class="tag">SL-4</span>Change record linked to the merge</td>
+        <td class="live"><span class="tag">SL-5</span>Remediation SLAs by severity</td>
+      </tr>
+      <tr>
+        <th scope="row">Inventory<span>Tooling in build</span></th>
+        <td class="build"><span class="tag">IV-1</span>Register of approved external sources</td>
+        <td class="build"><span class="tag">IV-2</span>Repository-to-service ownership mapping</td>
+        <td class="seam"><span class="tag">S2</span>Build output must register itself — no contract defined</td>
+        <td class="build"><span class="tag">IV-3</span>SBOM stored and queryable per digest</td>
+        <td class="seam"><span class="tag">S4</span>Deployed digest reconciled to inventory</td>
+        <td class="gapc"><span class="tag">S5</span>Digest-to-running-instance map across all platforms — the CVE blast-radius query</td>
+      </tr>
+      <tr>
+        <th scope="row">Build tooling<span>In build, boundary controls only</span></th>
+        <td class="seam"><span class="tag">S1</span>Entry contract: proxy is the only resolver</td>
+        <td class="none">—</td>
+        <td class="build"><span class="tag">BT-1</span>Ephemeral, isolated builds; control-plane signing</td>
+        <td class="seam"><span class="tag">S3</span>Exit contract: signed artefact, provenance, scan attestations</td>
+        <td class="none">—</td>
+        <td class="none">—</td>
+      </tr>
+      <tr>
+        <th scope="row">Deploy tooling<span>Controls in place</span></th>
+        <td class="none">—</td>
+        <td class="none">—</td>
+        <td class="none">—</td>
+        <td class="live"><span class="tag">DT-1</span>Only signed artefacts admitted to the registry</td>
+        <td class="live"><span class="tag">DT-2</span>Admission control verifies the VSA</td>
+        <td class="live"><span class="tag">DT-3</span>Drift detection against declared state</td>
+      </tr>
+      <tr>
+        <th scope="row">Release approvals<span>Release page, in build</span></th>
+        <td class="none">—</td>
+        <td class="none">—</td>
+        <td class="none">—</td>
+        <td class="build"><span class="tag">RA-1</span>Candidate assembled with its evidence pack</td>
+        <td class="build"><span class="tag">RA-2</span>Approval recorded against digest, not branch name</td>
+        <td class="live"><span class="tag">RA-3</span>Post-implementation review and rollback path</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Scanning across the lifecycle</h2>
+    <p>Each discipline answers a different question and produces evidence at a different point. The control's requirement is that every result binds to an artefact digest and is emitted as a signed attestation, so the promotion gate evaluates one evidence set rather than seven consoles.</p>
+  </div>
+  <div class="scroller">
+  <table>
+    <caption>Scanning disciplines: where they run, what they bind to, and how the result enters the chain.</caption>
+    <thead>
+      <tr><th scope="col">Discipline</th><th scope="col">Runs at</th><th scope="col">Answers</th><th scope="col">Binds to</th><th scope="col">Gate</th><th scope="col">Status</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">SCA<span>Composition</span></th>
+        <td>Ingress, build, and continuously post-release</td>
+        <td>What third-party code is in this artefact, and is any of it vulnerable now</td>
+        <td>SBOM per digest, plus the proxy's ingress record</td>
+        <td>Blocks ingress on policy breach; blocks promotion on severity threshold</td>
+        <td class="live">In place, needs digest binding</td>
+      </tr>
+      <tr>
+        <th scope="row">SAST<span>Static</span></th>
+        <td>Source, on pull request and on merge</td>
+        <td>Are there defects in code we wrote</td>
+        <td>Commit SHA, carried into provenance as the resolved source</td>
+        <td>Blocks merge; findings attach to the release candidate</td>
+        <td class="live">In place</td>
+      </tr>
+      <tr>
+        <th scope="row">DAST<span>Dynamic</span></th>
+        <td>Deploy, against a running instance in a pre-production environment</td>
+        <td>How does the running service behave against hostile input</td>
+        <td>The environment and the digest deployed into it</td>
+        <td>Gates promotion to production; re-runs on a schedule in production where safe</td>
+        <td class="live">In place, coverage uneven</td>
+      </tr>
+      <tr>
+        <th scope="row">IAST<span>Interactive</span></th>
+        <td>Runtime, instrumented, during functional and DAST test execution</td>
+        <td>Which code path actually executes, and is a known vulnerable function reachable</td>
+        <td>Digest, plus the agent build it ran under</td>
+        <td>Reachability evidence feeding VEX, not a blocking gate initially</td>
+        <td class="build">New — see below</td>
+      </tr>
+      <tr>
+        <th scope="row">MAST<span>Mobile</span></th>
+        <td>Artefact, on the signed mobile binary before store submission</td>
+        <td>Does the packaged app leak data, pin certificates, resist tampering</td>
+        <td>The submitted binary digest and version</td>
+        <td>Blocks store submission; release page holds the evidence</td>
+        <td class="build">Partial</td>
+      </tr>
+      <tr>
+        <th scope="row">Secrets<span>Credential exposure</span></th>
+        <td>Source and build, plus history scanning</td>
+        <td>Have credentials been committed or emitted in logs</td>
+        <td>Commit SHA and build invocation ID</td>
+        <td>Blocks merge; triggers rotation workflow</td>
+        <td class="live">In place</td>
+      </tr>
+      <tr>
+        <th scope="row">Container and IaC<span>Image and config</span></th>
+        <td>Build and artefact, plus registry re-scan</td>
+        <td>Base image currency, image CVEs, misconfigured infrastructure</td>
+        <td>Image digest and the IaC commit</td>
+        <td>Blocks promotion; base image age drives a separate clock</td>
+        <td class="live">In place</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><strong>Introducing IAST.</strong> Start it as an evidence source, not a gate. Instrument two or three tier-one JVM or .NET services in pre-production only, run the agent during existing functional and DAST suites, and use the output for one purpose: deciding whether a vulnerable dependency is actually reachable. That reachability verdict becomes the input to a VEX statement, which is what lets you defensibly deprioritise a critical CVE in a package you ship but never call. Expand to production instrumentation only after you have a performance budget agreed with the service owners, and never make IAST a promotion blocker until its false-positive rate is understood — a blocking control that teams learn to route around costs you more than the control gains.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>SLSA as the spine</h2>
+    <p>SLSA v1.2 gives one attestation format, so each pillar verifies the previous one instead of trusting it. Requirement names below are the spec's own headings, for direct citation.</p>
+  </div>
+  <div class="spine">
+    <div class="spine-bar"><strong>Provenance travels with the artefact</strong><span>Ingress → Build → Artefact → Deploy → Runtime</span></div>
+    <div class="spine-grid">
+      <div><span class="lvl">Build L1</span><h3>Provenance exists</h3><p>Provenance identifies the output by cryptographic digest. Producer requirements: choose an appropriate build platform, follow a consistent build process, distribute provenance.</p></div>
+      <div><span class="lvl">Build L2</span><h3>Provenance is authentic</h3><p>Generated by the control plane, not by a tenant, and signed with a key only the platform can reach. Addresses tampering after the build.</p></div>
+      <div><span class="lvl">Build L3</span><h3>Provenance is unforgeable + isolated</h3><p>Signing secrets unreachable from user build steps; every field generated or verified in a trusted control plane; external parameters fully enumerated; ephemeral environment per build; no cache poisoning. Addresses tampering during the build.</p></div>
+      <div><span class="lvl">Source L1–L4</span><h3>Source track</h3><p>L1 version controlled, L2 history and provenance, L3 continuous technical controls, L4 two-party review. Target L3 estate-wide, L4 for tier-one.</p></div>
+    </div>
+  </div>
+
+  <div class="scroller" style="margin-top:14px">
+  <table>
+    <caption>How each scanning discipline attaches to the SLSA spine.</caption>
+    <thead>
+      <tr><th scope="col">Evidence</th><th scope="col">Predicate</th><th scope="col">Produced by</th><th scope="col">Consumed at</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Build provenance</th><td><code>https://slsa.dev/provenance/v1</code></td><td>Build platform control plane</td><td>Promotion gate — step 1, check Build level</td></tr>
+      <tr><th scope="row">SBOM</th><td>SPDX or CycloneDX, as an in-toto predicate</td><td>Build, from the resolved dependency set</td><td>Promotion gate, and every subsequent CVE re-evaluation</td></tr>
+      <tr><th scope="row">Scan results<span>SAST, DAST, MAST, IAST, container</span></th><td>Bank-defined predicate type, one per discipline</td><td>Each scanner, wrapped by the pipeline</td><td>Promotion gate — policy evaluation</td></tr>
+      <tr><th scope="row">Exploitability</th><td>VEX (OpenVEX or CycloneDX VEX)</td><td>AppSec, informed by IAST reachability</td><td>CVE clock — suppresses or confirms a finding</td></tr>
+      <tr><th scope="row">Verification summary</th><td><code>https://slsa.dev/verification_summary/v1</code></td><td>The bank's policy engine at promotion</td><td>Deploy admission — the only thing the runtime gate checks</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p style="margin-top:14px;font-size:.88rem;color:var(--ink-soft)">SLSA does not define vulnerability scanning, and its FAQ is explicit that SBOM formats were judged a poor fit for the Build track. The scan predicates above are therefore bank-defined. What SLSA contributes is the binding: every one of them is an in-toto statement whose <code>subject</code> is the same artefact digest, signed, and evaluated together by one verifier that emits one VSA.</p>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Builder trust map</h2>
+    <p>With GitHub plus multiple CI platforms across Linux, Windows, internal and external cloud, the level is a property of each deployment, not of the product. This table is the control's root of trust and the thing that most needs governing.</p>
+  </div>
+  <div class="scroller">
+  <table>
+    <caption>Each row is a (signing key identity, builder.id) pair mapped to the maximum Build level trusted for it.</caption>
+    <thead>
+      <tr><th scope="col">Build platform</th><th scope="col">Configuration</th><th scope="col">Max level</th><th scope="col">Constraint</th></tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">GitHub Actions</th><td>GitHub-hosted runners, artifact attestations</td><td>Build L2</td><td>Vendor-asserted, not independently certified</td></tr>
+      <tr><th scope="row">GitHub Actions</th><td>Reusable workflows, GitHub-hosted</td><td>Build L3</td><td>Requires the workflow itself to be the trust boundary</td></tr>
+      <tr><th scope="row">GitHub Actions</th><td>Self-hosted runners, persistent</td><td class="gapc">Build L1</td><td>Fails "Isolated" — no ephemeral environment per build</td></tr>
+      <tr><th scope="row">GitHub Actions</th><td>Self-hosted runners, ephemeral, one job per VM</td><td>Build L2–L3</td><td>L3 only if signing keys are unreachable from build steps</td></tr>
+      <tr><th scope="row">Jenkins / Tekton / other internal CI</th><td>Bank-operated control plane</td><td>Assess individually</td><td>Level is a property of your deployment; needs its own assessment against "Assessing build platforms"</td></tr>
+      <tr><th scope="row">Windows build agents</th><td>Any platform</td><td>Separate entry</td><td>Different security attributes means a different <code>builder.id</code>, even on the same product</td></tr>
+      <tr><th scope="row">External cloud build services</th><td>Managed build platforms</td><td>Assess individually</td><td>Trust decision includes the provider's own control plane</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    <p><strong>The rule that makes this work.</strong> The spec treats <code>builder.id</code> as the sole determiner of the Build level, and requires a distinct identity for every mode of operation with different security attributes. So: one identity per runner class per operating system per hosting model, each resolving to a documented URI, and consumers accepting only specific signer-and-builder pairs. Get this register wrong and every downstream verification inherits the error.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>The CVE clock</h2>
+    <p>Provenance is immutable; vulnerability state is not. An artefact verified clean on Tuesday is not clean on Friday because a CVE was published on Wednesday. This is the part of the control that has a time dimension, and it needs a different design from every gate above.</p>
+  </div>
+  <div class="clock">
+    <div class="clock-row"><div class="t">T0</div><div class="d"><h3>Advisory published</h3><p>The clock starts at disclosure, not at the next build and not at the next scan run. Feed ingestion latency is itself a control metric: measure the gap between advisory publication and the bank knowing about it.</p></div></div>
+    <div class="clock-row"><div class="t">T0 + minutes</div><div class="d"><h3>Match against stored SBOMs</h3><p>Every artefact digest ever promoted has an SBOM on file. Matching happens against that store, not by rebuilding or rescanning. This is why S2 matters — an artefact that never registered itself is invisible to this query.</p></div></div>
+    <div class="clock-row"><div class="t">T0 + hours</div><div class="d"><h3>Blast radius</h3><p>Resolve affected digests to running instances across Linux, Windows, internal and external cloud. This is the query the regulator and the incident bridge both ask, and it is the current red gap in the control map.</p></div></div>
+    <div class="clock-row"><div class="t">T0 + 1 day</div><div class="d"><h3>Exploitability triage</h3><p>KEV, EPSS, reachability and exposure feed an SSVC decision that produces an action, not a score. A defensible "not affected" is worth more than a rushed patch cycle, but only if the reasoning is recorded as a signed VEX statement rather than a ticket comment. See the exploitability model below.</p></div></div>
+    <div class="clock-row"><div class="t">Severity SLA</div><div class="d"><h3>Remediate and re-verify</h3><p>Remediation produces a new digest, new provenance, new VSA. The old VSA is not revoked by the fix; it is superseded. Deployment gates must prefer the newest valid VSA for a resource, or the clock never actually stops.</p></div></div>
+    <div class="clock-row"><div class="t">Continuous</div><div class="d"><h3>VSA staleness</h3><p>A verification summary carries the time it was verified. Treat that timestamp as an expiry: past a defined age, admission requires re-evaluation even if nothing else changed. This is what turns a point-in-time gate into a standing control.</p></div></div>
+  </div>
+  <div class="note">
+    <p><strong>Design consequence.</strong> The spec's verification model is point-in-time by construction, and warns that a VSA does not protect against compromise of the verifier. For CVE tracking you need two things it does not give you: an expiry policy on verification results, and a persistent digest-to-instance index. Both are bank-built, both belong to the inventory pillar, and neither exists today.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Exploitability</h2>
+    <p>Severity alone generates an unworkable queue. The public pattern is to layer independent signals and end at a decision, not a number. Nothing below is bank-invented.</p>
+  </div>
+  <div class="clock">
+    <div class="clock-row"><div class="t">CVSS</div><div class="d"><h3>Intrinsic severity</h3><p>What the flaw could do if reached and exploited. Asset-agnostic and context-free, which is exactly why it cannot be the whole answer. Use base metrics as an input, not a ranking.</p></div></div>
+    <div class="clock-row"><div class="t">KEV</div><div class="d"><h3>Observed exploitation</h3><p>CISA's Known Exploited Vulnerabilities catalogue. Binary and high-confidence. Presence in KEV should short-circuit the tree straight to the shortest remediation clock.</p></div></div>
+    <div class="clock-row"><div class="t">EPSS</div><div class="d"><h3>Predicted likelihood</h3><p>FIRST's probability that a CVE is exploited in the wild in the next 30 days. Re-scored daily, so a finding's priority legitimately changes without the artefact changing — another reason verification results need an expiry.</p></div></div>
+    <div class="clock-row"><div class="t">Reachability</div><div class="d"><h3>Is the code called</h3><p>IAST during test execution, plus static call-graph analysis where available. This is the signal that most reduces queue volume and the one that requires the most investment to trust.</p></div></div>
+    <div class="clock-row"><div class="t">Exposure</div><div class="d"><h3>Where it runs</h3><p>Internet-facing or internal, data classification, mission criticality, which cloud. This comes from inventory, not from the scanner, which is why the S5 gap blocks the whole model.</p></div></div>
+    <div class="clock-row"><div class="t">SSVC</div><div class="d"><h3>The decision</h3><p>CISA and CMU SEI's decision-tree method. Walks decision points — exploitation status, automatable, technical impact, mission and well-being impact — and emits one of four actions: Track, Track*, Attend, Act. Adopt the deployer tree, calibrate the mission-impact points to HSBC's own tiering, and publish the tree so the outcome is reproducible and auditable.</p></div></div>
+  </div>
+
+  <div class="note">
+    <p><strong>Why a tree and not a score.</strong> SSVC produces an action with a traceable path through named decision points. That is the difference between telling a regulator "this was a 7.5 so we scheduled it" and showing the specific reasoning that led to a deferral. Publish the calibrated tree as a versioned artefact in the same repo as this control.</p>
+  </div>
+
+  <h3 style="margin-top:26px">Recording the outcome: VEX</h3>
+  <p style="font-size:.9rem;color:var(--ink-soft)">The machine-readable output of triage is a VEX statement bound to a product identifier. OpenVEX defines four statuses and, for <code>not_affected</code>, requires a fixed justification label or an impact statement. Only <code>not_affected</code> suppresses a finding; the others document without filtering.</p>
+  <div class="scroller">
+  <table>
+    <caption>OpenVEX statuses and the five not_affected justification labels.</caption>
+    <thead><tr><th scope="col">Status</th><th scope="col">Meaning in this control</th><th scope="col">Effect</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><code>under_investigation</code></th><td>Triage in progress. The default state at ingress, where consumer context does not yet exist.</td><td>No suppression; clock running</td></tr>
+      <tr><th scope="row"><code>not_affected</code></th><td>Technical determination, carrying one of: <code>component_not_present</code>, <code>vulnerable_code_not_present</code>, <code>vulnerable_code_not_in_execute_path</code>, <code>vulnerable_code_cannot_be_controlled_by_adversary</code>, <code>inline_mitigations_already_exist</code>.</td><td>Suppresses the finding</td></tr>
+      <tr><th scope="row"><code>affected</code></th><td>Real and reachable. Must carry a recommended action. This is where a waiver may apply, and only here.</td><td>Remediation clock by SSVC outcome</td></tr>
+      <tr><th scope="row"><code>fixed</code></th><td>Remediated in this digest. Produced automatically by the pipeline, not by a human.</td><td>Closes the finding for that digest</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="note">
+    <p><strong>The distinction that governs everything below.</strong> <code>not_affected</code> is an engineering claim about the artefact — falsifiable, evidence-backed, and it does not expire on a calendar. A waiver is a risk decision about an artefact that <em>is</em> affected — it expires, it needs an owner senior enough to carry it, and it must be scarce. Conflating the two is how exception processes rot: everything gets filed as "not exploitable" because that route has no expiry and no approver.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Waivers and exceptions</h2>
+    <p>The hard problem: at ingress there is no consumer, no environment and no exposure, so there is no context in which a risk decision can be made. The answer is not to make the decision earlier with less information — it is to defer it and carry the obligation forward.</p>
+  </div>
+
+  <div class="scroller">
+  <table>
+    <caption>Where a decision can legitimately be made, and what it binds to.</caption>
+    <thead><tr><th scope="col">Stage</th><th scope="col">Context available</th><th scope="col">Permitted decision</th><th scope="col">Binds to</th></tr></thead>
+    <tbody>
+      <tr>
+        <th scope="row">Ingress</th>
+        <td>Package and version only. No consumer, no exposure, no data class.</td>
+        <td class="gapc">No waiver. Quarantine, or admit with obligation and status <code>under_investigation</code>.</td>
+        <td>PURL — applies to every future consumer, which is why it is the most dangerous place to grant anything</td>
+      </tr>
+      <tr>
+        <th scope="row">Build / Artefact</th>
+        <td>Which service, which dependencies actually resolved, reachability if instrumented.</td>
+        <td class="seam"><code>not_affected</code> determination with a justification label</td>
+        <td>Artefact digest and subcomponent PURL</td>
+      </tr>
+      <tr>
+        <th scope="row">Release approval</th>
+        <td>Full context: exposure, data class, criticality, compensating controls.</td>
+        <td class="build">Time-boxed waiver on an <code>affected</code> finding, approval tier set by SSVC outcome</td>
+        <td>Digest + environment + expiry</td>
+      </tr>
+      <tr>
+        <th scope="row">Runtime</th>
+        <td>Live exposure, actual configuration, observed traffic.</td>
+        <td class="build">Emergency waiver, short fuse, mandatory re-review</td>
+        <td>Running instance + expiry measured in days</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:26px">The obligation pattern</h3>
+  <p style="font-size:.9rem;color:var(--ink-soft)">An ingress decision that cannot be made becomes a travelling obligation rather than a blocker or a blanket pass. The package is admitted with <code>under_investigation</code> attached to its PURL. Every artefact that later resolves that package inherits the open obligation through its SBOM. The obligation surfaces at the release gate, where context finally exists, and is discharged there as either a justified <code>not_affected</code> or an owned, expiring waiver. Nothing is waived in the dark, and nothing silently blocks a team that has no way to answer the question yet.</p>
+
+  <div class="base" style="margin-top:16px">
+    <div><h3>Scope is explicit</h3><p>Every waiver names vulnerability, component, product digest, environment and expiry. A waiver without all five is not a waiver, it is a hole.</p></div>
+    <div><h3>Signed, not ticketed</h3><p>Waivers are signed attestations bound to a digest, evaluated by the same policy engine as everything else. If it lives only in a ticket, the gate cannot enforce it and the auditor cannot verify it.</p></div>
+    <div><h3>Expiry is not renewable by default</h3><p>Renewal requires new evidence, not a repeat of the original argument. Second renewal escalates a tier. Third goes to the control owner with the service's remediation history attached.</p></div>
+    <div><h3>Approval tier tracks the decision</h3><p>SSVC Act and anything in KEV cannot be waived below executive level. Track and Track* can be self-approved by the service owner within budget.</p></div>
+    <div><h3>Waiver budgets</h3><p>Each service carries a cap on concurrent waivers. Exhausted budget blocks new non-emergency releases. This is what stops the fast path becoming the only path.</p></div>
+    <div><h3>Emergency path exists</h3><p>A documented break-glass with a fuse measured in days and automatic re-review. Teams route around controls that have no emergency path, so provide one and instrument it.</p></div>
+  </div>
+
+  <div class="note">
+    <p><strong>Anti-abuse instrumentation.</strong> The metrics matter more than the policy text: waivers granted per service per quarter, median age of open waivers, proportion of releases using the emergency path, renewal counts, and the ratio of <code>not_affected</code> determinations to <code>affected</code> findings per team. A team whose suppression ratio is far above the estate average is either unusually good at reachability analysis or is mislabelling risk acceptance as a technical determination, and the data tells you which to go and ask about.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Promotion paths</h2>
+    <p>We do not control every production deployment, so a deploy-time gate cannot be the only enforcement point. Instead, enforce where we already hold authority — the registry — and make an artefact's location a consequence of its evidence.</p>
+  </div>
+
+  <div class="scroller">
+  <table>
+    <caption>Three paths, one registry. Location is derived from the attestation set, never set by hand.</caption>
+    <thead><tr><th scope="col">Path</th><th scope="col">Holds</th><th scope="col">Who can pull</th><th scope="col">Route out</th></tr></thead>
+    <tbody>
+      <tr>
+        <th scope="row">Standard<span>Default</span></th>
+        <td class="live">Artefacts with a valid VSA and no obligation above the threshold. Open findings at SSVC Track and Track* ride here with the finding recorded.</td>
+        <td>Any deployment path, gated or not</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <th scope="row">Protected<span>Quarantine with a future</span></th>
+        <td class="seam">Artefacts carrying an undischarged obligation: <code>under_investigation</code> on a KEV or SSVC Act/Attend finding, or an unreviewed new package.</td>
+        <td class="build">Only deployment paths that enforce admission verification. Pull permission is the control.</td>
+        <td>Obligation discharged as <code>not_affected</code>, <code>fixed</code>, or an approved waiver → reconciler promotes to standard</td>
+      </tr>
+      <tr>
+        <th scope="row">Blocked<span>No path to production</span></th>
+        <td class="gapc">Unacceptable at any tier: no valid provenance, untrusted builder, unsigned, or a finding no waiver tier may accept.</td>
+        <td>Nothing</td>
+        <td>Rebuild, or an explicit control-owner decision recorded as an attestation</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note">
+    <p><strong>What this buys us.</strong> The failure mode becomes "cannot deploy" rather than "deployed unverified", and the incentive to onboard onto a gated deployment path sits with the service team rather than with AppSec chasing them. Enforcement moves to a chokepoint we own outright.</p>
+  </div>
+
+  <h3 style="margin-top:26px">Design constraints</h3>
+  <div class="base">
+    <div><h3>Location is derived state</h3><p>The attestation set decides the path; a reconciler moves the artefact. If the path itself becomes the security property, then whoever holds copy permission between paths is the real control — a much weaker thing to defend. Movement between paths is itself a signed, attested event.</p></div>
+    <div><h3>Scope what creates an obligation</h3><p>If every open finding routes to protected, everything lands there and gated capacity becomes the bottleneck. Only KEV, SSVC Act and Attend, and unreviewed packages create one. Review this threshold quarterly against the actual split.</p></div>
+    <div><h3>Ingress stays open for development</h3><p>Block at promotion, not at pull, except for packages unacceptable at any tier. A developer who cannot pull will vendor the source or build locally, which removes the proxy's visibility entirely — strictly worse than admitting the package with an obligation attached.</p></div>
+    <div><h3>Route out under pressure</h3><p>An ungated production service needing a hotfix for something sitting in protected is the first real incident with this design. The emergency waiver path must admit it on a short fuse, or teams will route around the registry.</p></div>
+    <div><h3>Pull telemetry as a proxy</h3><p>Where deployment is ungated, registry pull events give an approximate digest-to-environment map. Weaker than admission control — a pull is not a run — but often the fastest route to a blast-radius answer for the ungated estate.</p></div>
+    <div><h3>Coverage is the headline metric</h3><p>Percentage of the production estate on gated deployment, by risk tier, with "would have blocked" counts published for the remainder. That number justifies the investment and answers the regulator better than silence about the gap.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>Joining it up — don't build this from scratch</h2>
+    <p>The linking problem across SBOM, provenance, scan results, VEX and waivers is solved in public. Evaluate before building.</p>
+  </div>
+  <div class="base">
+    <div><h3>GUAC</h3><p>OpenSSF incubating project that ingests SPDX and CycloneDX SBOMs, SLSA and in-toto attestations, OSV, OpenVEX and CSAF VEX into one graph with a GraphQL API. Its stated use cases are exactly this control's hard queries: blast radius of a vulnerability, whether all production binaries trace to a managed repository, which applications are missing SBOMs or attestations. Created by Kusari, Google, Purdue and Citi — there is a bank precedent to cite.</p></div>
+    <div><h3>OpenVEX and vexctl</h3><p>Specification plus tooling for creating and merging VEX documents; statements replay chronologically to compute current status. Trivy and other scanners consume VEX to filter findings, so suppression is applied by the scanner rather than argued in a spreadsheet.</p></div>
+    <div><h3>SSVC</h3><p>CISA and CMU SEI publish the decision trees, a calculator and a JSON schema, including a vector string format that records the full decision path. Adopt and calibrate rather than inventing a bank-specific scoring model.</p></div>
+    <div><h3>Sigstore and policy-as-code</h3><p>Cosign for signing and verifying in-toto attestations; an admission policy engine to evaluate provenance, scan attestations, VEX and waivers as one policy at the gate. The waiver becomes a policy input, not a manual override.</p></div>
+    <div><h3>OSV and deps.dev</h3><p>Machine-readable vulnerability data keyed to package versions, which is what makes SBOM-to-advisory matching automatable rather than a name-matching exercise.</p></div>
+    <div><h3>What stays bank-built</h3><p>The calibrated SSVC tree, the builder trust map, waiver budgets and approval tiers, the digest-to-running-instance index across four target platforms, and VSA expiry policy. Everything else should be adopted.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>The seams AppSec owns</h2>
+    <p>Each pillar's tooling defines controls at its own boundary. Nobody owns the space between two boundaries. Threat labels are from the SLSA v1.2 threat model.</p>
+  </div>
+  <div class="seams">
+    <div class="seamcard"><span class="id">S1 · Ingress → Build</span><h3>Resolution integrity</h3><p>Proves the build consumed only what the proxy screened. Without it a build can bypass ingress entirely and the ingress control means nothing downstream.</p><p class="owner">Evidence: resolved dependency list reconciled to proxy records.</p><p class="threat">Threats: (D) external parameters, (H) dependency confusion</p></div>
+    <div class="seamcard"><span class="id">S2 · Build → Inventory</span><h3>Registration on emit</h3><p>Every build output registers itself with its SBOM. No contract defined between build tooling and inventory tooling today, which is what makes the CVE blast-radius query unanswerable.</p><p class="owner">Evidence: digest present in inventory within the build window.</p><p class="threat">Prerequisite for the CVE clock</p></div>
+    <div class="seamcard"><span class="id">S3 · Build → Artefact</span><h3>Attestation handover</h3><p>Signed artefact plus provenance plus scan attestations is the only permitted exit from build tooling. Anything else cannot be promoted.</p><p class="owner">Evidence: signature and provenance verify against the registered builder key.</p><p class="threat">Threats: (E) build process, (F) artefact publication</p></div>
+    <div class="seamcard"><span class="id">S4 · Approval → Deploy</span><h3>Approval binds to digest</h3><p>Release approval must reference the exact artefact admitted. Approving a branch or version string leaves a substitution gap. Where deployment is ungated, the registry path is the enforcement point instead.</p><p class="owner">Evidence: admitted digest equals approved digest; protected-path pull permission restricted to gated deployers.</p><p class="threat">Threats: (G) distribution channel</p></div>
+    <div class="seamcard"><span class="id">S5 · Deploy → Runtime</span><h3>Running inventory</h3><p>What is actually running, at which digest, on which platform. Without this the control can prove what was approved but not what is live.</p><p class="owner">Evidence: reconciliation of running instances to admitted digests, across all four target platforms.</p><p class="threat">Blast radius, drift, and the regulatory question</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>What SLSA does not cover</h2>
+    <p>State these explicitly. A control that implies SLSA closes them will fail its first serious review.</p>
+  </div>
+  <div class="base">
+    <div><h3>Malicious producer</h3><p>Not addressable by SLSA controls. Covered by joiner vetting, access management and two-party review.</p></div>
+    <div><h3>Code quality and vulnerabilities</h3><p>SLSA says nothing about whether the code is secure. That is what the scanning disciplines above are for.</p></div>
+    <div><h3>Reviewer collusion and bugdoors</h3><p>Explicitly out of scope. Mitigated by rotation, sampling and independent review of high-risk changes.</p></div>
+    <div><h3>Transitive dependencies</h3><p>An artefact's level is independent of its dependencies' levels. Apply the framework recursively or accept the gap knowingly.</p></div>
+    <div><h3>Platform insider at L3</h3><p>Build L3 does not cover compromise of the build platform itself. Needs PAM, audit and two-person change on the platform.</p></div>
+    <div><h3>Typosquatting and availability</h3><p>Neither is addressed. The ingress proxy and the draft Dependency track are the relevant controls.</p></div>
+  </div>
+</section>
+
+<footer>
+  <p>Draft skeleton for review. Control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+</footer>
+
+</div>
+</body>
+</html>
