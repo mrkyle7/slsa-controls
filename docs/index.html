@@ -177,13 +177,17 @@ footer p{font-size:.8rem}
 </header>
 
 <!-- LAYER SWITCHER. To add a layer later (e.g. stages): add a <button role="tab" data-layer="x">
-     here, and a matching <div class="layer" id="layer-x" data-layer="x"> below. No JS changes needed. -->
+     here, and a matching &lt;div class="layer" id="layer-NAME"&gt; below. No JS changes needed. -->
 <nav class="layers" role="tablist" aria-label="Control layers">
   <span class="lab">Layer</span>
   <button role="tab" id="tab-base" data-layer="base" aria-controls="layer-base" aria-selected="true">Control overview</button>
-  <button role="tab" id="tab-foss" data-layer="foss" aria-controls="layer-foss" aria-selected="false">Path: FOSS dependencies</button>
+  <button role="tab" id="tab-foss" data-layer="foss" aria-controls="layer-foss" aria-selected="false">FOSS overview</button>
+  <button role="tab" id="tab-java" data-layer="java" aria-controls="layer-java" aria-selected="false">Java</button>
+  <button role="tab" id="tab-python" data-layer="python" aria-controls="layer-python" aria-selected="false">Python</button>
+  <button role="tab" id="tab-npm" data-layer="npm" aria-controls="layer-npm" aria-selected="false">npm</button>
+  <button role="tab" id="tab-go" data-layer="go" aria-controls="layer-go" aria-selected="false">Go</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v2</span>
+  <span class="vpill">v3</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -645,59 +649,48 @@ footer p{font-size:.8rem}
 
   <section>
     <div class="sec-head">
-      <h2>Ecosystem characteristics</h2>
-      <p>These differences drive tooling choice more than any vendor comparison will.</p>
+      <h2>Ecosystem comparison</h2>
+      <p>The differences below drive tooling choice more than any vendor comparison will. Each ecosystem has its own layer with the full lifecycle walk — use the tabs above.</p>
     </div>
-    <div class="eco">
-
-      <div class="ecocard">
-        <h3>Java <span>Maven · Gradle</span></h3>
-        <dl>
-          <dt>What arrives</dt><dd>Compiled jars. Source is almost never present, so all analysis is bytecode analysis.</dd>
-          <dt>Resolution integrity</dt><dd>Coordinates plus checksums; no ecosystem-wide transparency log. The proxy is the integrity control.</dd>
-          <dt>SBOM point</dt><dd>Build, via a CycloneDX build plugin. Transitive graph is well defined and resolvable.</dd>
-          <dt>Reachability</dt><dd>Strong. Bytecode call-graph analysis is mature and mostly reliable.</dd>
-          <dt>Licence metadata</dt><dd>Declared in the POM, usually present, frequently wrong or incomplete for transitive deps.</dd>
-        </dl>
-        <p class="risk"><b>Path-specific risk:</b> shaded and fat jars. Relocated classes lose their coordinates entirely, so the SBOM must be generated before shading. After it, only binary composition analysis has any chance, and it will miss things.</p>
-      </div>
-
-      <div class="ecocard">
-        <h3>Python <span>pip · poetry · uv</span></h3>
-        <dl>
-          <dt>What arrives</dt><dd>Mixed. Pure-source sdists, prebuilt wheels, and wheels containing compiled native extensions with vendored C libraries inside.</dd>
-          <dt>Resolution integrity</dt><dd>Weak without a lock file; resolution varies by platform, Python version and environment markers.</dd>
-          <dt>SBOM point</dt><dd>Build, from the installed environment rather than from requirements.txt — the two routinely disagree.</dd>
-          <dt>Reachability</dt><dd>Weakest of the four. Dynamic imports and runtime patching defeat static call graphs; treat verdicts as advisory.</dd>
-          <dt>Licence metadata</dt><dd>Inconsistent. Classifiers and metadata fields often disagree or are absent; detection from files is usually required.</dd>
-        </dl>
-        <p class="risk"><b>Path-specific risk:</b> vendored native code inside wheels. A CVE in a bundled C library will not appear in any Python-level dependency graph. Binary scanning of the installed environment is the only way to see it.</p>
-      </div>
-
-      <div class="ecocard">
-        <h3>npm <span>npm · pnpm · yarn</span></h3>
-        <dl>
-          <dt>What arrives</dt><dd>Source, but in very large transitive trees. Lock file is mandatory for any reproducibility.</dd>
-          <dt>Resolution integrity</dt><dd>Lock file integrity hashes are good; the risk is what installation does, not what it fetches.</dd>
-          <dt>SBOM point</dt><dd>Before bundling. Minification and tree-shaking destroy component identity.</dd>
-          <dt>Reachability</dt><dd>Moderate for CommonJS/ESM static imports; poor once dynamic requires or bundling are involved.</dd>
-          <dt>Licence metadata</dt><dd>Usually declared and machine-readable. Quality is the best of the four, but dual-licensing is common and needs a policy answer.</dd>
-        </dl>
-        <p class="risk"><b>Path-specific risk:</b> lifecycle scripts execute on install. That is code execution at ingress, before any gate has run. Disable scripts in the proxy and in CI, and treat any package requiring them as an exception with a named owner.</p>
-      </div>
-
-      <div class="ecocard">
-        <h3>Go <span>modules</span></h3>
-        <dl>
-          <dt>What arrives</dt><dd>Source, always. Modules are immutable and verified against the public checksum database.</dd>
-          <dt>Resolution integrity</dt><dd>Strongest of the four. Checksum database plus go.sum gives tamper evidence out of the box.</dd>
-          <dt>SBOM point</dt><dd>Build — but also recoverable from the compiled binary, which embeds module and version information.</dd>
-          <dt>Reachability</dt><dd>Best of the four. govulncheck reports whether vulnerable symbols are actually called, not merely present.</dd>
-          <dt>Licence metadata</dt><dd>None. Go modules carry no licence field at all; licences must be detected from source files in the module cache.</dd>
-        </dl>
-        <p class="risk"><b>Path-specific risk:</b> static linking. A Go binary in a scratch container shows nothing to a conventional image scanner, so image-layer scanning alone will report a clean artefact that contains vulnerable code.</p>
-      </div>
-
+    <div class="scroller">
+    <table>
+      <caption>Where each ecosystem is strong and weak. Open the ecosystem layer for detail.</caption>
+      <thead><tr><th scope="col">Ecosystem</th><th scope="col">Arrives as</th><th scope="col">Resolution integrity</th><th scope="col">Reachability</th><th scope="col">Licence metadata</th><th scope="col">Defining risk</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Java<span>Maven, Gradle</span></th>
+          <td>Compiled jars</td>
+          <td class="build">Checksums, no transparency log</td>
+          <td class="live">Strong — bytecode call graphs</td>
+          <td class="build">Declared in POM, often incomplete</td>
+          <td class="seam">Shading destroys identity</td>
+        </tr>
+        <tr>
+          <th scope="row">Python<span>pip, poetry, uv</span></th>
+          <td>Mixed source and wheels</td>
+          <td class="gapc">Weak without a lock file</td>
+          <td class="gapc">Weakest — dynamic imports</td>
+          <td class="gapc">Inconsistent, often absent</td>
+          <td class="seam">Vendored native code in wheels</td>
+        </tr>
+        <tr>
+          <th scope="row">npm<span>npm, pnpm, yarn</span></th>
+          <td>Source, very large trees</td>
+          <td class="live">Lockfile integrity hashes</td>
+          <td class="build">Moderate, lost after bundling</td>
+          <td class="live">Usually declared, dual-licensing common</td>
+          <td class="gapc">Code execution at install time</td>
+        </tr>
+        <tr>
+          <th scope="row">Go<span>modules</span></th>
+          <td>Source, always</td>
+          <td class="live">Checksum database — strongest</td>
+          <td class="live">Best — symbol-level via govulncheck</td>
+          <td class="gapc">None at all in module metadata</td>
+          <td class="seam">Static binaries look empty to scanners</td>
+        </tr>
+      </tbody>
+    </table>
     </div>
   </section>
 
@@ -854,8 +847,197 @@ footer p{font-size:.8rem}
 
 </div><!-- /layer-foss -->
 
+
+<div class="layer" id="layer-java" data-layer="java" role="tabpanel" aria-labelledby="tab-java" hidden>
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Java — Maven and Gradle</h2>
+      <p>Everything arrives compiled, so every analysis is bytecode analysis. The good news is that bytecode is unusually amenable to it.</p>
+    </div>
+    <p style="font-size:.92rem">Java is the largest share of the estate and the one where reachability analysis pays back fastest. The single technical decision that determines whether any of this works is <strong>where in the build the SBOM is generated relative to shading</strong>.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Java-specific control at each stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Ingress</th><td class="live">Proxy is the only configured repository; checksum verified; GAV coordinates recorded</td><td>Maven Central has no transparency log, so the proxy record is the provenance of record. Block direct repository declarations in POMs.</td></tr>
+        <tr><th scope="row">Source</th><td class="live">Dependency declarations reviewed; version ranges prohibited; parent POM and BOM imports pinned</td><td>Gradle dynamic versions and Maven ranges both break reproducibility. Enforce in the build policy, not by convention.</td></tr>
+        <tr><th scope="row">Build</th><td class="live">CycloneDX Maven or Gradle plugin emits the SBOM from the resolved graph, before any shade or shadow step</td><td class="seam">This is the control. Emitted after shading, the SBOM is fiction.</td></tr>
+        <tr><th scope="row">Artefact</th><td class="build">Jar signed; SBOM attested to the digest; binary composition analysis as a cross-check</td><td>Cross-check catches classes present in the jar but absent from the declared graph.</td></tr>
+        <tr><th scope="row">Deploy</th><td class="live">Policy evaluation of SBOM, provenance, VEX and waivers</td><td>No Java specifics — the generic gate applies.</td></tr>
+        <tr><th scope="row">Runtime</th><td class="build">Continuous advisory re-match; call-graph reachability; IAST on tier-one services</td><td>JVM agents are mature, so Java is also the easiest IAST pilot target.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">F1</span><h3>Shaded and fat jars</h3><p>Relocated classes lose their coordinates entirely. After shading, only binary composition analysis has a chance, and it will miss things.</p><p class="owner">Fix: emit the SBOM pre-shade. Flag any artefact where this was not done as degraded context.</p></div>
+      <div class="seamcard"><span class="id">J2</span><h3>Transitive licence blindness</h3><p>POM licence declarations are frequently missing or wrong for transitive dependencies, and the problematic licence is usually several levels down.</p><p class="owner">Fix: detect from the artefacts in the local repository rather than trusting declared metadata.</p></div>
+      <div class="seamcard"><span class="id">J3</span><h3>Application server and container provided dependencies</h3><p>Dependencies marked provided do not appear in the artefact but do appear at runtime, so the SBOM under-reports what actually executes.</p><p class="owner">Fix: record provided scope in the SBOM and reconcile against the runtime platform's own inventory.</p></div>
+      <div class="seamcard"><span class="id">J4</span><h3>Legacy builds with no plugin</h3><p>Older Ant or hand-rolled builds cannot emit a resolved graph at all.</p><p class="owner">Fix: treat as compiled-artefact-only context. Binary analysis with confidence flagged, and a dated migration.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. SBOM plugin in the standard build template</h3><p>Positioned before shade or shadow. This is the change that makes everything downstream true.</p></div>
+      <div><h3>2. Prohibit version ranges</h3><p>Ranges make the resolved graph non-deterministic, which undermines both the SBOM and any re-match against it.</p></div>
+      <div><h3>3. Call-graph reachability on tier-one</h3><p>Java has the maturity to support it and the volume to justify it. This is where the vulnerability queue actually shrinks.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-java -->
+
+<div class="layer" id="layer-python" data-layer="python" role="tabpanel" aria-labelledby="tab-python" hidden>
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Python — pip, poetry, uv</h2>
+      <p>The hardest of the four to do well. Resolution is environment-dependent, packaging hides native code, and reachability analysis cannot be trusted.</p>
+    </div>
+    <p style="font-size:.92rem">Two properties drive everything: <strong>what is installed depends on the machine it was installed on</strong> — platform, Python version, environment markers — and <strong>a wheel can contain compiled C that no Python-level tool will ever see</strong>. Both point to the same conclusion: analyse the built environment, not the manifest.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Python-specific control at each stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Ingress</th><td class="live">Proxy is the only index; hash-checking mode enabled; sdist build isolation enforced</td><td class="seam">An sdist runs setup.py at install time — the same execution-before-gate problem npm has. Prefer wheels; treat sdist-only packages as exceptions.</td></tr>
+        <tr><th scope="row">Source</th><td class="build">Lock file mandatory and committed; requirements.txt alone is not acceptable evidence</td><td>Without a lock file the context is "manifest only" and the SBOM cannot be authoritative.</td></tr>
+        <tr><th scope="row">Build</th><td class="live">SBOM generated from the installed environment, not from the manifest</td><td class="seam">The two routinely disagree. The installed environment is the truth.</td></tr>
+        <tr><th scope="row">Artefact</th><td class="build">Binary scan of site-packages to surface vendored native libraries</td><td>This is the only way CVEs in bundled C libraries become visible.</td></tr>
+        <tr><th scope="row">Deploy</th><td class="live">Generic policy gate</td><td>Pin the interpreter version — it is part of the resolution context.</td></tr>
+        <tr><th scope="row">Runtime</th><td class="build">Advisory re-match; IAST rather than static reachability</td><td class="seam">Static call graphs are defeated by dynamic imports and monkey-patching. Runtime observation is the only credible reachability source here.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">F2</span><h3>Vendored native code in wheels</h3><p>A CVE in a bundled C library appears in no Python dependency graph. Data science and cryptography packages are the usual carriers.</p><p class="owner">Fix: binary scanning of the installed environment, treated as a required stage rather than an enhancement.</p></div>
+      <div class="seamcard"><span class="id">P2</span><h3>Environment-dependent resolution</h3><p>The same manifest resolves differently by platform and interpreter version, so an SBOM from one build does not describe another.</p><p class="owner">Fix: SBOM per build context; never reuse across platforms.</p></div>
+      <div class="seamcard"><span class="id">P3</span><h3>Reachability is unreliable</h3><p>Dynamic imports, reflection and runtime patching defeat static analysis. A "not reachable" verdict here is far weaker evidence than the same verdict in Go or Java.</p><p class="owner">Fix: do not accept static reachability as a VEX justification for Python. Require IAST or remediate.</p></div>
+      <div class="seamcard"><span class="id">P4</span><h3>Licence metadata quality</h3><p>Classifiers and metadata fields disagree or are missing often enough that declared licence alone is not defensible.</p><p class="owner">Fix: file-level detection is mandatory on this path, not optional.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Lock files everywhere</h3><p>Without them there is no deterministic graph and nothing else on this path holds.</p></div>
+      <div><h3>2. Environment-based SBOM generation</h3><p>Generate from what was installed. This single change also surfaces the platform-specific resolution problem.</p></div>
+      <div><h3>3. Binary scan of site-packages</h3><p>The only route to the vendored-native blind spot, and the one most likely to find something material.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-python -->
+
+<div class="layer" id="layer-npm" data-layer="npm" role="tabpanel" aria-labelledby="tab-npm" hidden>
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>npm — npm, pnpm, yarn</h2>
+      <p>Good integrity metadata, enormous dependency trees, and one structural problem the other three do not have: installation executes code.</p>
+    </div>
+    <p style="font-size:.92rem">The npm path has the clearest single priority in this whole layer set. <strong>Lifecycle scripts run at install time, before any gate has evaluated anything.</strong> That is arbitrary code execution inside the build estate, triggered by dependency resolution. It should be closed before anything else on this path is refined.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>npm-specific control at each stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Ingress</th><td class="gapc">Scripts disabled by default in the proxy and CI; package age and typosquat heuristics applied</td><td class="seam">Highest-priority control on this path. Packages genuinely requiring scripts become named, owned exceptions.</td></tr>
+        <tr><th scope="row">Source</th><td class="live">Lock file committed and enforced; clean-install semantics in CI so the lock file cannot drift</td><td>Integrity hashes in the lock file are good evidence — use them.</td></tr>
+        <tr><th scope="row">Build</th><td class="live">SBOM generated before bundling, minification or tree-shaking</td><td class="seam">Bundling destroys component identity as thoroughly as Java shading.</td></tr>
+        <tr><th scope="row">Artefact</th><td class="build">Bundle attested alongside its pre-bundle SBOM</td><td>Post-bundle scanning of a minified file tells you almost nothing.</td></tr>
+        <tr><th scope="row">Deploy</th><td class="live">Generic policy gate</td><td>Note whether the bundle ships to browsers — that changes the exposure input to SSVC.</td></tr>
+        <tr><th scope="row">Runtime</th><td class="build">Advisory re-match against the pre-bundle SBOM</td><td>Reachability is weak post-bundle; prefer remediation over exploitability argument here.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">F3</span><h3>Install-time code execution</h3><p>postinstall and friends run before any gate. This is the vector behind most recent registry compromises.</p><p class="owner">Fix: scripts off by default, everywhere, with an exception register.</p></div>
+      <div class="seamcard"><span class="id">N2</span><h3>Bundling destroys identity</h3><p>Minified output cannot be composed back into packages, so the artefact cannot be analysed after the fact.</p><p class="owner">Fix: pre-bundle SBOM, attested, treated as the record for that digest.</p></div>
+      <div class="seamcard"><span class="id">N3</span><h3>Transitive tree size</h3><p>Thousands of packages per application makes per-finding human triage arithmetically impossible.</p><p class="owner">Fix: this path depends more than any other on automated VEX and SSVC filtering rather than manual review.</p></div>
+      <div class="seamcard"><span class="id">N4</span><h3>Dual licensing</h3><p>Metadata quality is good, but dual-licensed packages need a recorded choice, and an unrecorded choice is an unmanaged obligation.</p><p class="owner">Fix: policy states the preferred licence per dual-licensed package; the choice is recorded in the SBOM.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Disable lifecycle scripts</h3><p>Proxy and CI. Highest-value single control anywhere on the FOSS path.</p></div>
+      <div><h3>2. Enforce clean-install from the lock file</h3><p>Stops silent drift between what was reviewed and what was built.</p></div>
+      <div><h3>3. Move SBOM generation before the bundler</h3><p>Otherwise the artefact's composition evidence is worthless.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-npm -->
+
+<div class="layer" id="layer-go" data-layer="go" role="tabpanel" aria-labelledby="tab-go" hidden>
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Go — modules</h2>
+      <p>The strongest integrity story of the four and the best reachability tooling, with two sharp edges: static binaries look empty to scanners, and module metadata carries no licence information at all.</p>
+    </div>
+    <p style="font-size:.92rem">Go is where this path gets cheap wins. The checksum database provides tamper evidence without any bank-built control, binaries embed their own module inventory, and <strong>govulncheck reports whether a vulnerable symbol is actually called</strong> rather than merely present. That last property is what every other ecosystem is trying to approximate.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Go-specific control at each stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Ingress</th><td class="live">Proxy configured with checksum verification against the public database</td><td>If the internal proxy bypasses checksum verification, the ecosystem's best property is thrown away. Verify this is configured.</td></tr>
+        <tr><th scope="row">Source</th><td class="live">go.mod and go.sum committed; vendoring decision made deliberately and consistently</td><td>Vendored modules still carry version data, so vendoring is less damaging here than elsewhere.</td></tr>
+        <tr><th scope="row">Build</th><td class="live">SBOM from the module graph; reproducible build flags set</td><td>Go builds are close to reproducible by default, which strengthens provenance claims.</td></tr>
+        <tr><th scope="row">Artefact</th><td class="build">Binary retains embedded module information as a fallback inventory</td><td class="seam">Image scanning alone will report a scratch-based Go image as clean. Do not rely on it.</td></tr>
+        <tr><th scope="row">Deploy</th><td class="live">Generic policy gate</td><td>—</td></tr>
+        <tr><th scope="row">Runtime</th><td class="live">govulncheck in CI and on a schedule; symbol-level reachability feeds VEX directly</td><td>This is the cheapest credible reachability in the estate. Switch it on now.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">F4</span><h3>Static binaries look empty</h3><p>A conventional image scanner finds no packages in a scratch container and reports clean, regardless of what is compiled in.</p><p class="owner">Fix: build SBOM is mandatory; binary-embedded module data is the fallback for third-party binaries.</p></div>
+      <div class="seamcard"><span class="id">G2</span><h3>No licence metadata</h3><p>Go modules carry no licence field. Nothing declares anything, so declared-licence tooling returns nothing rather than returning something wrong.</p><p class="owner">Fix: file-level detection across the module cache is the only option; budget for it explicitly.</p></div>
+      <div class="seamcard"><span class="id">G3</span><h3>Cgo and linked C libraries</h3><p>Where cgo is used, a C library is linked in and falls outside the module graph entirely — the Go equivalent of the Python wheel problem.</p><p class="owner">Fix: flag cgo usage in the build and require binary scanning for those artefacts.</p></div>
+      <div class="seamcard"><span class="id">G4</span><h3>Proxy configuration risk</h3><p>An internal proxy that disables checksum database verification silently removes the ecosystem's strongest control.</p><p class="owner">Fix: verify and monitor the setting; treat a change to it as a control incident.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. govulncheck estate-wide</h3><p>Near-free symbol-level reachability. The fastest queue reduction available anywhere in this control.</p></div>
+      <div><h3>2. Verify checksum database enforcement on the proxy</h3><p>Confirm the strongest property in the ecosystem has not been configured away.</p></div>
+      <div><h3>3. Licence detection over the module cache</h3><p>Nothing else will produce licence data for Go, and its absence is easy to miss precisely because no tool errors.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-go -->
+
 <footer>
-  <p>Document v2 — adds the FOSS dependency path layer (Java, Python, npm, Go) and the layer switcher. v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v3 — splits the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
