@@ -186,8 +186,9 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-python" data-layer="python" aria-controls="layer-python" aria-selected="false">Python</button>
   <button role="tab" id="tab-npm" data-layer="npm" aria-controls="layer-npm" aria-selected="false">npm</button>
   <button role="tab" id="tab-go" data-layer="go" aria-controls="layer-go" aria-selected="false">Go</button>
+  <button role="tab" id="tab-containers" data-layer="containers" aria-controls="layer-containers" aria-selected="false">Containers</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v3</span>
+  <span class="vpill">v4</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1036,8 +1037,110 @@ footer p{font-size:.8rem}
   </section>
 </div><!-- /layer-go -->
 
+
+<div class="layer" id="layer-containers" data-layer="containers" role="tabpanel" aria-labelledby="tab-containers" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Path: containers</h2>
+      <p>Images behave differently from every other artefact in this control: most of their vulnerabilities are inherited rather than written, and the thing deployed is frequently not the thing that was scanned.</p>
+    </div>
+    <p style="font-size:.92rem">Two properties define this path. <strong>A tag is a mutable pointer, not an identity</strong> — so scanning <code>app:1.4</code> proves nothing about what admission later pulls under that name. And <strong>most image CVEs are fixed by rebuilding on a current base, not by changing code</strong> — so remediation is a pipeline cadence problem rather than a developer backlog problem. Both change how the gate and the clock work.</p>
+    <div class="note">
+      <p><strong>Relationship to the FOSS layers.</strong> An image scan resolves OS packages well and application dependencies badly. The container path covers the base and OS layer; the application layer's composition comes from the build SBOM on the relevant language path. Neither is sufficient alone, and an image scan reported as complete coverage is the most common overstatement in this area.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Container-specific control at each stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Ingress</th>
+          <td class="live">External images enter only through the internal registry; base images restricted to an approved golden set</td>
+          <td class="seam">Base image choice is the single highest-leverage decision on this path. A curated set of a dozen bases removes more CVEs than any scanner configuration.</td>
+        </tr>
+        <tr>
+          <th scope="row">Source</th>
+          <td class="build">Dockerfile review: base pinned by digest, no floating tags, non-root user, multi-stage separation of build tooling from runtime</td>
+          <td>Linting catches most of this mechanically. The digest pin is the part that matters for everything downstream.</td>
+        </tr>
+        <tr>
+          <th scope="row">Build</th>
+          <td class="live">SBOM generated for the final stage only; provenance emitted by the build platform; reproducible flags where supported</td>
+          <td class="seam">Build-stage tooling must not appear in the runtime SBOM — and must not ship in the image either.</td>
+        </tr>
+        <tr>
+          <th scope="row">Artefact</th>
+          <td class="live">Image signed; SBOM, provenance and VEX attached to the image digest as OCI referrers; promoted by digest</td>
+          <td>Attaching attestations to the digest is what makes the evidence travel with the image across registries.</td>
+        </tr>
+        <tr>
+          <th scope="row">Deploy</th>
+          <td class="build">Admission verifies signature and VSA; deployment manifests reference digests, not tags</td>
+          <td class="seam">A digest-pinned manifest is what closes the mutable-tag gap. Without it the gate verifies one artefact and the cluster runs another.</td>
+        </tr>
+        <tr>
+          <th scope="row">Runtime</th>
+          <td class="build">Continuous registry re-scan; base image age monitored; drift detection; no exec-into-container changes persisting</td>
+          <td>Running containers should be immutable. Anything patched in place is invisible to every control above.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>The second clock: base image currency</h2>
+      <p>The CVE clock in the control overview starts at advisory publication. This path needs a second, independent clock — and it is usually the one that actually drives remediation volume.</p>
+    </div>
+    <div class="clock">
+      <div class="clock-row"><div class="t">Why separate</div><div class="d"><h3>Inherited, not authored</h3><p>The majority of findings in a typical image come from OS packages the team never chose. No code change fixes them; a rebuild on a current base does. Treating these as application defects on a developer backlog is the standard failure, and it produces large queues that nobody can action.</p></div></div>
+      <div class="clock-row"><div class="t">Leading metric</div><div class="d"><h3>Base image age</h3><p>Time since the running image's base was last rebuilt. It predicts CVE exposure before the advisories arrive, and unlike finding counts it is actionable by one team with one pipeline.</p></div></div>
+      <div class="clock-row"><div class="t">Mechanism</div><div class="d"><h3>Scheduled rebuild, not scheduled patching</h3><p>Golden bases rebuild on a fixed cadence and on advisory triggers. Downstream images rebuild against the new base automatically where the pipeline allows it. The service team's involvement should be testing the result, not sourcing the fix.</p></div></div>
+      <div class="clock-row"><div class="t">Escape valve</div><div class="d"><h3>Distroless and minimal bases</h3><p>Fewer packages means fewer inherited findings and a smaller attack surface. The trade is debuggability and, for scratch images, that conventional scanners report nothing at all — see the Go layer.</p></div></div>
+      <div class="clock-row"><div class="t">Boundary</div><div class="d"><h3>Where the clocks meet</h3><p>An application-layer CVE runs on the CVE clock and is owned by the service team. An OS-layer CVE runs on the base currency clock and is owned by the platform. Every image finding should route to one of the two, and a finding that routes to neither is a gap in the ownership model rather than a triage problem.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">C1</span><h3>Mutable tags</h3><p>A tag can be repointed after scanning and approval. The artefact verified at the gate and the artefact pulled by the node are then different things, and nothing in the chain detects it.</p><p class="owner">Fix: digests in deployment manifests; tags permitted only as human-readable aliases in non-production.</p></div>
+      <div class="seamcard"><span class="id">C2</span><h3>Layer archaeology</h3><p>A file deleted in a later layer remains present in the earlier one. Secrets removed by a subsequent <code>RUN</code> are still in the image and still extractable.</p><p class="owner">Fix: secret scanning across all layers, not the flattened filesystem; build secrets via mount rather than copy.</p></div>
+      <div class="seamcard"><span class="id">C3</span><h3>Build tooling shipped to production</h3><p>Single-stage builds leave compilers, package managers and credentials in the runtime image, expanding both attack surface and the finding count.</p><p class="owner">Fix: multi-stage builds as a standard; lint for it.</p></div>
+      <div class="seamcard"><span class="id">C4</span><h3>Application layer invisible to image scanning</h3><p>Image scanners resolve OS packages well and application dependencies poorly or not at all. A clean image scan over a fat jar or a Go binary says very little.</p><p class="owner">Fix: image SBOM and build SBOM are both required; the gate evaluates them together.</p></div>
+      <div class="seamcard"><span class="id">C5</span><h3>Unapproved public base images</h3><p>Pulling directly from public registries bypasses the golden set, and unofficial images carry both provenance and licence uncertainty.</p><p class="owner">Fix: registry allow-list at the network layer, so the control cannot be bypassed by a Dockerfile edit.</p></div>
+      <div class="seamcard"><span class="id">C6</span><h3>Windows containers</h3><p>Larger images, different scanner coverage, and licensing considerations the Linux path does not have. Coverage assumptions from Linux do not transfer.</p><p class="owner">Fix: assess scanner support explicitly for the Windows estate rather than assuming parity.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Licence considerations</h2></div>
+    <div class="base">
+      <div><h3>OS packages carry obligations too</h3><p>A base image bundles hundreds of packages under many licences. For internally deployed services this is usually low risk; for anything distributed to customers it is not, and the obligation attaches to the image rather than to the application.</p></div>
+      <div><h3>Golden bases solve it once</h3><p>Licence review on a small curated set of bases, refreshed on rebuild, is tractable. The same review across every team's ad-hoc base choices is not. This is a second strong argument for the golden set.</p></div>
+      <div><h3>Notices for distributed images</h3><p>Where images ship outside the bank, attribution must cover the OS layer as well as the application dependencies, generated from the image SBOM rather than assembled by hand.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Golden base image pipeline</h3><p>A small curated set, rebuilt on a cadence and on advisory triggers, owned by the platform. This is the highest-leverage control on the path and it reduces finding volume before any triage effort is spent.</p></div>
+      <div><h3>2. Digest pinning end to end</h3><p>Base images pinned in Dockerfiles, images pinned in deployment manifests. Without this the verification chain has a hole at the last step, whatever else is in place.</p></div>
+      <div><h3>3. Attach attestations to the digest</h3><p>SBOM, provenance and VEX as OCI referrers, verified at admission. This is what lets the evidence travel with the image and makes the promotion-path model work for containers.</p></div>
+    </div>
+  </section>
+
+</div><!-- /layer-containers -->
+
 <footer>
-  <p>Document v3 — splits the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v4 — adds the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
