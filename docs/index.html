@@ -187,8 +187,10 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-npm" data-layer="npm" aria-controls="layer-npm" aria-selected="false">npm</button>
   <button role="tab" id="tab-go" data-layer="go" aria-controls="layer-go" aria-selected="false">Go</button>
   <button role="tab" id="tab-containers" data-layer="containers" aria-controls="layer-containers" aria-selected="false">Containers</button>
+  <button role="tab" id="tab-vendor" data-layer="vendor" aria-controls="layer-vendor" aria-selected="false">Vendor binaries</button>
+  <button role="tab" id="tab-freeware" data-layer="freeware" aria-controls="layer-freeware" aria-selected="false">Freeware &amp; shareware</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v4</span>
+  <span class="vpill">v5</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1139,8 +1141,155 @@ footer p{font-size:.8rem}
 
 </div><!-- /layer-containers -->
 
+
+<div class="layer" id="layer-vendor" data-layer="vendor" role="tabpanel" aria-labelledby="tab-vendor" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Path: vendor binaries</h2>
+      <p>Commercial software delivered as compiled artefacts — COTS applications, agents, libraries, appliances. No source, no build control, and a supplier who may or may not answer the questions this control asks.</p>
+    </div>
+    <p style="font-size:.92rem">Every other path in this control works by generating evidence. This one cannot: <strong>we do not run the build, so we cannot produce provenance — we can only require it, verify what arrives, and constrain what the artefact is permitted to do.</strong> The consequence is that the real gate sits in procurement, months before anything reaches the registry, and the technical controls are containment rather than verification.</p>
+    <div class="note">
+      <p><strong>SLSA position.</strong> Vendor artefacts sit at Build L0 by default, because nothing about their build is verifiable to us. A vendor supplying signed SLSA provenance moves to whatever level their builder supports — but that is their claim about their platform, not our verification of it. Record vendor-supplied provenance as evidence received, never as a level we have assured. The bank's own VSA for a vendor artefact should assert what we actually checked: signature validity, binary composition, and behavioural review.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>The gate is contractual</h2>
+      <p>The leverage exists at purchase and renewal, and essentially nowhere else. These clauses are what make the technical controls below possible.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>Contract levers, and what each one buys the control.</caption>
+      <thead><tr><th scope="col">Lever</th><th scope="col">What to require</th><th scope="col">What it enables</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">SBOM delivery</th><td>Machine-readable SBOM (SPDX or CycloneDX) per released version, not per contract</td><td class="live">Advisory re-matching without binary analysis; the difference between knowing and guessing during an incident</td></tr>
+        <tr><th scope="row">Vulnerability SLAs</th><td>Remediation timelines by severity, and notification obligations independent of remediation</td><td class="live">A clock that runs on the vendor rather than an open-ended waiver on our side</td></tr>
+        <tr><th scope="row">Secure development attestation</th><td>Attestation against a recognised framework such as the NIST SSDF</td><td class="build">Evidence of process where evidence of artefact is unavailable</td></tr>
+        <tr><th scope="row">Artefact signing</th><td>Signed releases and a published, stable key or certificate identity</td><td class="live">The one genuinely strong technical control on this path</td></tr>
+        <tr><th scope="row">Right to test</th><td>Permission to scan, decompile for security purposes, and pentest</td><td class="build">Makes binary analysis contractually safe rather than a licence breach</td></tr>
+        <tr><th scope="row">Fourth-party disclosure</th><td>Disclosure of the vendor's own critical dependencies and sub-processors</td><td class="seam">Visibility of concentration risk that no scan will ever reveal</td></tr>
+        <tr><th scope="row">EOL and escrow</th><td>Notice periods for end of support; source escrow for critical systems</td><td class="build">Prevents unsupported software becoming a permanent waiver</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note">
+      <p><strong>Alignment note.</strong> These requirements overlap substantially with existing third-party and operational resilience obligations already managed elsewhere in the bank. Route this through the third-party risk function rather than creating a parallel AppSec process — the control's job is to specify the technical requirements and consume the evidence, not to own supplier management. Confirm the specific regulatory mapping with that team.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Vendor-specific control at each stage. The stages shift meaning on this path.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Procurement<span>Replaces source</span></th><td class="build">Security requirements in the contract; architecture and data-flow review before signature</td><td class="seam">The only point of real leverage. After signature the options narrow to containment.</td></tr>
+        <tr><th scope="row">Ingress</th><td class="live">Artefact downloaded once, signature and hash verified, re-hosted in the internal registry</td><td class="seam">Never install from a vendor URL at deploy time. That turns every deployment into an unreviewed ingress event.</td></tr>
+        <tr><th scope="row">Analysis<span>Replaces build</span></th><td class="build">Binary composition analysis for embedded components; behavioural review in a sandbox; secret and telemetry inspection</td><td>BCA on a vendor binary is weak evidence but not no evidence — flag confidence explicitly, as in the FOSS context matrix.</td></tr>
+        <tr><th scope="row">Artefact</th><td class="build">Internal digest recorded; bank-issued VSA describing what was actually verified; vendor SBOM stored against that digest</td><td>The stored SBOM is what makes the next incident answerable in hours rather than weeks.</td></tr>
+        <tr><th scope="row">Deploy</th><td class="live">Least privilege, network egress constrained, auto-update disabled</td><td class="seam">Auto-update is an unreviewed ingress channel into production. This is the mechanism behind the best-known vendor compromises.</td></tr>
+        <tr><th scope="row">Runtime</th><td class="build">Advisory matching against the stored SBOM; vendor notification monitoring; egress and behaviour monitoring</td><td>Where no SBOM exists, monitoring is the compensating control — state that plainly rather than implying coverage.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">V1</span><h3>Auto-update as unreviewed ingress</h3><p>Software that updates itself has a direct channel into production that bypasses every gate in this control. A compromised vendor update mechanism is the highest-impact scenario on this path.</p><p class="owner">Fix: auto-update disabled; updates re-hosted and re-verified through the same ingress as the original.</p></div>
+      <div class="seamcard"><span class="id">V2</span><h3>No SBOM, no answer</h3><p>Without a vendor SBOM, "are we exposed to this CVE?" cannot be answered for that product during an incident.</p><p class="owner">Fix: contractual SBOM delivery; BCA as an interim; the gap recorded on the risk register rather than left implicit.</p></div>
+      <div class="seamcard"><span class="id">V3</span><h3>Agents inside the trust boundary</h3><p>Monitoring, security and backup agents run privileged on production hosts and often on build infrastructure. An agent on a build runner undermines any SLSA L3 claim for everything that runner produces.</p><p class="owner">Fix: inventory what runs on build infrastructure; treat the build estate as a restricted population with its own approval bar.</p></div>
+      <div class="seamcard"><span class="id">V4</span><h3>Fourth-party opacity</h3><p>The vendor's own dependencies are invisible, and concentration risk accumulates where several vendors depend on the same upstream component.</p><p class="owner">Fix: disclosure clauses; concentration analysis at portfolio level, not per product.</p></div>
+      <div class="seamcard"><span class="id">V5</span><h3>End of support</h3><p>Unsupported software cannot be remediated at all, so every future finding becomes a permanent waiver.</p><p class="owner">Fix: EOL dates tracked as a control input; approaching EOL triggers replacement planning rather than a waiver renewal.</p></div>
+      <div class="seamcard"><span class="id">V6</span><h3>Licence restrictions on analysis</h3><p>Some EULAs prohibit decompilation or benchmarking, making parts of the analysis stage a contractual breach.</p><p class="owner">Fix: right-to-test clause negotiated at purchase; where refused, record the resulting analysis limitation as an accepted risk.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Standard security schedule for contracts</h3><p>One reusable clause set covering SBOM, SLAs, signing, right to test and EOL notice. Applied at every renewal, which is where the whole estate eventually passes through.</p></div>
+      <div><h3>2. Kill auto-update into production</h3><p>Re-host and re-verify every update. This closes the single highest-impact vector on the path and needs no vendor cooperation.</p></div>
+      <div><h3>3. Inventory vendor software on build infrastructure</h3><p>Agents on runners are the quiet contradiction in any Build L3 claim. Find them before someone else does.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-vendor -->
+
+<div class="layer" id="layer-freeware" data-layer="freeware" role="tabpanel" aria-labelledby="tab-freeware" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Path: freeware and shareware</h2>
+      <p>Utilities, developer tools, trial software and prebuilt binaries acquired without a contract, a supplier relationship or, often, a record that they exist.</p>
+    </div>
+    <p style="font-size:.92rem">This path carries the worst ratio of risk to attention in the whole control. <strong>There is no counterparty to make requirements of, no support commitment, frequently no signature, and — decisively — these binaries usually arrive on endpoints and build agents rather than through a pipeline.</strong> That places them inside the trust boundary the rest of this control depends on, while sitting outside every gate it defines.</p>
+    <div class="note">
+      <p><strong>Boundary with the FOSS path.</strong> A prebuilt binary of an open-source project — a release asset rather than a package-manager dependency — belongs on this path, not the FOSS one. The source being public does not mean the binary was built from it, and nothing links the two unless the project publishes provenance. Build from source and you are on the FOSS path; download the binary and you are here.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What we are actually dealing with</h2>
+      <p>The category is heterogeneous, and the sub-types need different answers.</p>
+    </div>
+    <div class="base">
+      <div><h3>Freeware</h3><p>Free, proprietary, no source. Common for niche utilities. Security posture is unknowable; the only real control is whether it is needed at all.</p></div>
+      <div><h3>Shareware and trials</h3><p>Free to evaluate, payment required for continued or commercial use. The risk is as much licence compliance as security: trial software in production is an audit finding waiting to happen.</p></div>
+      <div><h3>Open-source release binaries</h3><p>Source exists but was not used. Treat as binary unless built internally or accompanied by verifiable provenance.</p></div>
+      <div><h3>Free tiers of commercial products</h3><p>A vendor relationship exists but without contractual leverage. Terms can change unilaterally, including terms governing data handling.</p></div>
+      <div><h3>Abandonware</h3><p>Still functioning, no longer maintained, no route to remediation. Every finding is permanent by definition.</p></div>
+      <div><h3>Developer tooling</h3><p>The highest-risk subset, because it runs with developer privilege on machines with source access and credentials. Frequently installed without any approval at all.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Freeware and shareware control at each stage. Acquisition is the decisive stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Request<span>Replaces procurement</span></th><td class="build">Catalogue request with a named owner, business justification and a review date; legal check on the licence terms</td><td class="seam">A self-service catalogue with a fast path is what stops people installing it anyway. An approval process slower than a download will be bypassed.</td></tr>
+        <tr><th scope="row">Ingress</th><td class="build">Downloaded once from the origin, hash and signature verified where offered, mirrored into the internal store and pinned</td><td class="seam">Some licences prohibit internal redistribution — check before mirroring, and record where it was refused.</td></tr>
+        <tr><th scope="row">Analysis</th><td class="build">Sandbox detonation and behavioural review; BCA for embedded components; egress and telemetry inspection</td><td>Weight the analysis by where it will run. Anything destined for a build agent gets the full treatment.</td></tr>
+        <tr><th scope="row">Distribution</th><td class="build">Deployed only from the internal store; direct download blocked at the network layer</td><td class="seam">Without the network control, the catalogue is advisory and the real ingress path is the browser.</td></tr>
+        <tr><th scope="row">Use</th><td class="gapc">Endpoint and build-agent inventory; unapproved software detected and removed</td><td>This is where most estates discover what they are actually running.</td></tr>
+        <tr><th scope="row">Review</th><td class="build">Hard expiry on every catalogue entry; re-justification rather than automatic renewal; maintenance status re-checked</td><td>Abandonment is silent — nothing notifies you that a project stopped being maintained.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">W1</span><h3>Inside the build trust boundary</h3><p>Unvetted tools on build agents and developer machines sit inside the boundary that Build L2 and L3 claims depend on. This is the direct contradiction: hardened builds running unreviewed third-party binaries.</p><p class="owner">Fix: build infrastructure gets a strict allow-list with a higher approval bar than general endpoints.</p></div>
+      <div class="seamcard"><span class="id">W2</span><h3>No signature, no provenance</h3><p>Much of this category ships unsigned over plain download links. There is nothing to verify and nothing to pin except a hash we observed once.</p><p class="owner">Fix: pin the observed hash at first admission; re-verify on every update; treat a hash change without a release note as an incident.</p></div>
+      <div class="seamcard"><span class="id">W3</span><h3>Licence terms that prohibit commercial use</h3><p>"Free for personal use" software running on bank infrastructure is a compliance exposure that no security scanner will ever surface.</p><p class="owner">Fix: legal review at catalogue entry; periodic re-check, since terms change without notice.</p></div>
+      <div class="seamcard"><span class="id">W4</span><h3>Bundled adware and telemetry</h3><p>Installers in this category bundle additional software and phone home with data that may include material the bank cannot allow to leave.</p><p class="owner">Fix: behavioural analysis before approval; egress monitoring after.</p></div>
+      <div class="seamcard"><span class="id">W5</span><h3>Silent abandonment</h3><p>No advisory feed announces that a project stopped being maintained. Software degrades from supported to abandoned with no event to trigger review.</p><p class="owner">Fix: maintenance status is a scheduled re-check, not an alert. Last-release-date thresholds drive it.</p></div>
+      <div class="seamcard"><span class="id">W6</span><h3>Invisible install base</h3><p>Without endpoint inventory the population is unknown, which makes the blast-radius query unanswerable for this entire category.</p><p class="owner">Fix: reconcile endpoint and build-agent inventory against the catalogue; the delta is the actual risk position.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Find out what is installed</h3><p>Endpoint and build-agent inventory reconciled against an approved catalogue. Every other control on this path depends on knowing the population, and the first run of this is usually uncomfortable.</p></div>
+      <div><h3>2. A catalogue with a genuinely fast path</h3><p>Approval must be faster than the workaround. A slow process does not reduce installations, it only reduces visibility of them.</p></div>
+      <div><h3>3. Lock down build infrastructure first</h3><p>Highest concentration of risk and the smallest population to control. It is also what protects the SLSA claims the rest of this control rests on.</p></div>
+    </div>
+  </section>
+</div><!-- /layer-freeware -->
+
 <footer>
-  <p>Document v4 — adds the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v5 — adds the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
