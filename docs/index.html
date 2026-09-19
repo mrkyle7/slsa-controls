@@ -189,8 +189,9 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-containers" data-layer="containers" aria-controls="layer-containers" aria-selected="false">Containers</button>
   <button role="tab" id="tab-vendor" data-layer="vendor" aria-controls="layer-vendor" aria-selected="false">Vendor binaries</button>
   <button role="tab" id="tab-freeware" data-layer="freeware" aria-controls="layer-freeware" aria-selected="false">Freeware &amp; shareware</button>
+  <button role="tab" id="tab-source" data-layer="source" aria-controls="layer-source" aria-selected="false">Source &amp; forks</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v5</span>
+  <span class="vpill">v6</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1288,8 +1289,145 @@ footer p{font-size:.8rem}
   </section>
 </div><!-- /layer-freeware -->
 
+
+<div class="layer" id="layer-source" data-layer="source" role="tabpanel" aria-labelledby="tab-source" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Path: harvested source and forks</h2>
+      <p>Upstream source pulled in through the FOSS harvester, modified, built internally, and — where possible — contributed back.</p>
+    </div>
+    <p style="font-size:.92rem">This path inverts the control. Everywhere else the bank is a consumer verifying someone else's claims. Here, <strong>the moment we modify and build, we become the producer</strong>. The SLSA producer requirements now apply to us, the artefact is no longer the upstream one, and the responsibility for its security moves inside the bank. That is a genuine capability — it is also the path where identity quietly breaks if the control does not handle it explicitly.</p>
+    <div class="note">
+      <p><strong>The core problem: identity divergence.</strong> Our build of a library at version 2.17.1 with three local patches is not 2.17.1, but every advisory feed, scanner and SBOM matcher will treat it as though it were. That produces errors in both directions — false positives where we patched ahead of upstream, and false negatives where an upstream fix has not been rebased in. Neither is visible without deliberate handling, and the second is the dangerous one.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Lifecycle walk</h2>
+      <p>The harvester is an ingress event, and the internal build makes us a producer. Both need their own evidence.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>Control at each stage on the harvested source path.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Harvest<span>Source ingress</span></th>
+          <td class="build">Pull from the official repository at a specific commit or signed tag; record the source digest, signature status and upstream URL as a harvest attestation</td>
+          <td class="seam">"We got this from GitHub" is not provenance. The commit hash, the verification result and the time are.</td>
+        </tr>
+        <tr>
+          <th scope="row">Fork repo</th>
+          <td class="live">Upstream imported unmodified as the base commit; every local change a discrete, reviewed, signed commit with a recorded reason</td>
+          <td class="seam">Patches squashed into an import are unrebaseable and un-upstreamable. The patch series is the asset.</td>
+        </tr>
+        <tr>
+          <th scope="row">Build</th>
+          <td class="live">Internal build platform; full Source and Build track requirements now apply to us</td>
+          <td>Provenance names a bank builder. This is the one path where we can legitimately claim Build L3 for a third-party component.</td>
+        </tr>
+        <tr>
+          <th scope="row">Artefact</th>
+          <td class="build">SBOM declares fork identity and upstream ancestry; VEX statements issued for every divergence from upstream vulnerability status</td>
+          <td class="seam">Without this the artefact is indistinguishable from upstream to every downstream consumer and tool.</td>
+        </tr>
+        <tr>
+          <th scope="row">Deploy</th>
+          <td class="live">Generic gate; the fork is a first-class internal artefact and uses the normal promotion paths</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <th scope="row">Runtime</th>
+          <td class="build">Advisory matching against upstream identity, then adjusted by the local patch set</td>
+          <td class="seam">Match on upstream version first so nothing is missed, then apply VEX to resolve what we have already fixed.</td>
+        </tr>
+        <tr>
+          <th scope="row">Upstream</th>
+          <td class="build">Patches submitted back; local patch retired once merged and released</td>
+          <td>The only mechanism that permanently reduces the maintenance burden.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Fork debt</h2>
+      <p>Every local patch is a standing liability that grows with upstream distance. Measure it directly rather than inferring it from incidents.</p>
+    </div>
+    <div class="clock">
+      <div class="clock-row"><div class="t">Rebase lag</div><div class="d"><h3>Releases behind upstream</h3><p>The leading indicator. A fork three releases behind is carrying unapplied security fixes whether or not anyone has noticed, and the cost of catching up rises non-linearly.</p></div></div>
+      <div class="clock-row"><div class="t">Patch count</div><div class="d"><h3>How far we have diverged</h3><p>A handful of small patches is maintainable. Dozens means an internal maintainership nobody agreed to take on, and the exit cost keeps rising.</p></div></div>
+      <div class="clock-row"><div class="t">Patch age</div><div class="d"><h3>Time since each patch was written</h3><p>An old patch that has not been upstreamed is usually one of three things: unacceptable to upstream, never submitted, or forgotten. Each needs a different answer.</p></div></div>
+      <div class="clock-row"><div class="t">Upstream rate</div><div class="d"><h3>Proportion of patches merged upstream</h3><p>The health metric for the whole path. A low rate means the fork is permanent and should be resourced as a maintained internal product, or abandoned.</p></div></div>
+      <div class="clock-row"><div class="t">Exit plan</div><div class="d"><h3>Every fork has an expiry</h3><p>Forks are created with a stated intent: upstream it, replace it, or adopt it deliberately. A fork with no route out becomes an unowned internal dependency, which is the worst of both models.</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Contributing back</h2>
+      <p>Upstream-first should be the default: a merged patch is maintained by the community, a local patch is maintained by us forever. The route needs to be fast enough that engineers use it.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>The contribution route, and what each step exists to catch.</caption>
+      <thead><tr><th scope="col">Step</th><th scope="col">Control</th><th scope="col">Catches</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Intent</th><td class="live">Decide upstream-first before writing the patch; design the change to be acceptable to the project</td><td>Patches written only for internal needs are usually unmergeable, which is how permanent forks begin</td></tr>
+        <tr><th scope="row">Sanitisation</th><td class="build">Automated check for internal hostnames, identifiers, credentials, proprietary logic and internal comments</td><td class="seam">Accidental disclosure of internal architecture — the most likely real harm on this path</td></tr>
+        <tr><th scope="row">Legal and IP</th><td class="build">CLA or DCO sign-off, patent implications, employer attribution reviewed once per project rather than per patch</td><td>Unclear IP position; per-patch legal review that makes contribution too slow to use</td></tr>
+        <tr><th scope="row">Security embargo</th><td class="seam">Security fixes routed through the project's disclosure process, never submitted as an ordinary public PR</td><td class="gapc">Publishing a fix is publishing the vulnerability. A public commit is a disclosure to everyone running the unpatched version</td></tr>
+        <tr><th scope="row">Submission</th><td class="build">Contribution under a recorded identity, tracked against the local patch</td><td>Patches submitted and then lost track of, so the local one is never retired</td></tr>
+        <tr><th scope="row">Retirement</th><td class="build">Local patch removed once the merged fix reaches a release we consume; fork closed when the patch set empties</td><td>Divergence persisting after the reason for it has gone</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note">
+      <p><strong>The embargo step is the one to get right.</strong> If an engineer finds and fixes a security bug in an upstream project, the ordinary contribution route is the wrong one — an open PR containing a security fix tells every attacker exactly what to exploit in every unpatched deployment worldwide, including ours. That path needs a named owner in AppSec, a coordinated disclosure route to the project, and an internal patch we can carry during the embargo period without publishing it. Build this before it is needed, because it will be needed at short notice.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Licence obligations</h2></div>
+    <div class="base">
+      <div><h3>Modification changes the obligation</h3><p>Several licences require modified files to carry a notice of change. Apache-2.0 and the GPL family both do, in different forms. Consuming unmodified and shipping modified are materially different positions.</p></div>
+      <div><h3>Distribution is the trigger</h3><p>Internal use of a modified copyleft component generally carries no source-provision duty; distributing the binary does. Mobile apps, customer-installed software and appliances are the paths where this bites.</p></div>
+      <div><h3>Network use counts for AGPL</h3><p>Under AGPL, offering the service over a network can trigger the source obligation without any binary leaving the bank. Flag AGPL components at harvest, not at release.</p></div>
+      <div><h3>Notices must reflect the fork</h3><p>Attribution generated from the SBOM has to describe the modified component and its origin, not the upstream release it started from.</p></div>
+      <div><h3>Contribution grants rights</h3><p>Submitting a patch licenses it under the project terms and may carry a patent grant. That is fine and intended, but it is a decision the bank makes once per project, with legal, rather than per engineer.</p></div>
+      <div><h3>Harvest-time screening</h3><p>Licence evaluation happens when source is harvested, because that is when the choice to depend on it is made. Discovering an incompatible licence at release is discovering it too late.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">S1</span><h3>Silent identity collision</h3><p>The fork reports an upstream version it no longer matches, so scanners, SBOM consumers and advisory feeds all draw the wrong conclusion.</p><p class="owner">Fix: distinct internal identity in the SBOM with recorded upstream ancestry; VEX for every divergence.</p></div>
+      <div class="seamcard"><span class="id">S2</span><h3>Unapplied upstream security fixes</h3><p>The failure mode that matters. Upstream patches a vulnerability, our fork does not rebase, and the version string still looks current to everyone.</p><p class="owner">Fix: advisory matching on upstream identity is mandatory and cannot be suppressed by fork status alone.</p></div>
+      <div class="seamcard"><span class="id">S3</span><h3>Invisible forks</h3><p>Source copied into an application repository rather than harvested — vendored by hand — carries no fork record at all and will never be matched against an advisory.</p><p class="owner">Fix: detect copied third-party source in code scanning; route it onto this path retrospectively.</p></div>
+      <div class="seamcard"><span class="id">S4</span><h3>Harvest without provenance</h3><p>Source pulled from a mirror, a fork of the real project, or an unverified tag. The upstream identity is then an assumption rather than a fact.</p><p class="owner">Fix: harvest attestation recording repository, commit, signature status and time — treated as ingress evidence.</p></div>
+      <div class="seamcard"><span class="id">S5</span><h3>Maintainership by accident</h3><p>A fork nobody planned to own becomes a critical internal dependency with no maintainer, no test coverage and no exit route.</p><p class="owner">Fix: named owner and stated exit intent at fork creation; forks without either are closed or adopted deliberately.</p></div>
+      <div class="seamcard"><span class="id">S6</span><h3>Disclosure through contribution</h3><p>A public patch can leak internal architecture, or — worse — an unembargoed security fix.</p><p class="owner">Fix: automated sanitisation plus a separate embargo route with a named AppSec owner.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Give forks a distinct identity in the SBOM</h3><p>With upstream ancestry recorded. Until this exists, every fork is silently misreported to every tool that consumes our SBOMs, including our own gate.</p></div>
+      <div><h3>2. Match advisories on upstream identity regardless</h3><p>Then resolve with VEX. Erring towards false positives here is correct; the alternative is missing an upstream fix we never rebased.</p></div>
+      <div><h3>3. Build the embargo contribution route now</h3><p>It is needed at short notice, under pressure, and improvising it is how a coordinated disclosure becomes an uncoordinated one.</p></div>
+    </div>
+  </section>
+
+</div><!-- /layer-source -->
+
 <footer>
-  <p>Document v5 — adds the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v6 — adds the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
