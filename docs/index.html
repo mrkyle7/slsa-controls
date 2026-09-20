@@ -159,6 +159,37 @@ footer p{font-size:.8rem}
 .ecocard dd{margin:.1rem 0 0;color:var(--ink-soft)}
 .ecocard .risk{margin-top:.8rem;padding-top:.7rem;border-top:1px dashed var(--rule);font-size:.82rem}
 .ecocard .risk b{color:var(--seam);font-weight:600}
+/* risk finding treatment grid */
+:root{--mvp:#6B4E9E;--mvp-bg:#E8E1F2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--mvp:#B49BDC;--mvp-bg:#241C33}}
+:root[data-theme="dark"]{--mvp:#B49BDC;--mvp-bg:#241C33}
+.finding{background:var(--card);border:1px solid var(--rule);border-radius:3px;margin-bottom:18px;overflow:hidden}
+.finding>header{padding:14px 15px;border-bottom:1px solid var(--rule)}
+.finding>header h3{font-size:1.05rem;margin:0}
+.finding>header .meta{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-soft);margin-top:4px}
+.finding>header p{font-size:.87rem;color:var(--ink-soft);margin:.5rem 0 0;max-width:70ch}
+.treat{display:grid;grid-template-columns:132px repeat(3,1fr);font-size:.82rem}
+.treat>div{padding:11px 12px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.treat>div:nth-child(4n){border-right:0}
+.treat .th{background:var(--paper);font-weight:600;font-size:.76rem}
+.treat .rl{background:var(--paper);font-weight:600;font-size:.8rem;line-height:1.35}
+.treat .rl small{display:block;font-weight:400;color:var(--ink-soft);font-size:.72rem;margin-top:3px}
+.treat .rl.golden{box-shadow:inset 3px 0 0 var(--build)}
+.treat .rl.detect{box-shadow:inset 3px 0 0 var(--seam)}
+.treat .rl.mitig{box-shadow:inset 3px 0 0 var(--live)}
+.treat .rl.mvp{box-shadow:inset 3px 0 0 var(--mvp)}
+.treat .empty{color:var(--ink-soft);font-style:italic}
+@media (max-width:780px){
+  .treat{grid-template-columns:1fr}
+  .treat>div{border-right:0}
+  .treat .th{display:none}
+  .treat .rl{border-top:2px solid var(--ink);background:var(--paper)}
+  .treat>div[data-h]::before{content:attr(data-h);display:block;font-family:"IBM Plex Mono",monospace;
+    font-size:.66rem;color:var(--ink-soft);margin-bottom:3px}
+}
+.keyrow{display:flex;flex-wrap:wrap;gap:8px 16px;margin:14px 0 0;font-size:.8rem;color:var(--ink-soft)}
+.keyrow span{display:flex;align-items:center;gap:6px}
+.keyrow i{width:11px;height:11px;border-radius:2px;display:block}
 </style>
 </head>
 <body>
@@ -190,8 +221,9 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-vendor" data-layer="vendor" aria-controls="layer-vendor" aria-selected="false">Vendor binaries</button>
   <button role="tab" id="tab-freeware" data-layer="freeware" aria-controls="layer-freeware" aria-selected="false">Freeware &amp; shareware</button>
   <button role="tab" id="tab-source" data-layer="source" aria-controls="layer-source" aria-selected="false">Source &amp; forks</button>
+  <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v6</span>
+  <span class="vpill">v7</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1426,8 +1458,126 @@ footer p{font-size:.8rem}
 
 </div><!-- /layer-source -->
 
+
+<div class="layer" id="layer-findings" data-layer="findings" role="tabpanel" aria-labelledby="tab-findings" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Treating risk findings</h2>
+      <p>One repeatable shape for every finding: four treatments across three horizons. The shape matters more than any individual entry, because it makes findings comparable and makes gaps visible without anyone having to argue for them.</p>
+    </div>
+    <p style="font-size:.92rem">The four treatments are not alternatives to choose between. They answer different questions, and <strong>the empty cells are the finding's real risk position</strong>. A finding with only mitigations is being survived rather than managed. A golden path with no detection cannot tell you who is not on it. Detection with no golden path produces a backlog with nowhere to send people.</p>
+
+    <div class="scroller">
+    <table>
+      <caption>What each treatment is for, and what its absence means.</caption>
+      <thead><tr><th scope="col">Treatment</th><th scope="col">Question it answers</th><th scope="col">If it is empty</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Golden path</th><td>What is the supported, safe way to do this?</td><td class="gapc">No destination. Detection produces offenders with nowhere to go, and enforcement is unfair.</td></tr>
+        <tr><th scope="row">Identify outside the path</th><td>How do we know who is not using it?</td><td class="gapc">The golden path is a recommendation, not a control. Coverage is unknown and unprovable.</td></tr>
+        <tr><th scope="row">General mitigations</th><td>What reduces harm for everything we cannot reach?</td><td class="gapc">Full exposure between now and whenever the path is universal — which is always longer than planned.</td></tr>
+        <tr><th scope="row">MVP / proof of value</th><td>Where no known solution exists, what are we testing?</td><td class="build">Acceptable if the problem is solved elsewhere. If it is not, this cell empty means the gap is permanent.</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <div class="note">
+      <p><strong>Horizons.</strong> Short is what ships in weeks and is usually mitigation and detection. Medium is the golden path being built, typically a quarter or two. Long is enforcement, decommissioning the alternatives, and graduating whatever the MVP proved. Mitigations carry an expiry like a waiver does — if a short-term mitigation is still the primary control at the long horizon, the plan failed and the finding should be re-opened rather than quietly re-labelled.</p>
+    </div>
+    <div class="keyrow">
+      <span><i style="background:var(--build)"></i>Golden path</span>
+      <span><i style="background:var(--seam)"></i>Identify outside</span>
+      <span><i style="background:var(--live)"></i>Mitigations</span>
+      <span><i style="background:var(--mvp)"></i>MVP</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Worked example</h2>
+      <p>Agent skills pulled from the internet. New enough that no golden path exists yet, which makes it a good test of whether the model handles novelty.</p>
+    </div>
+
+    <div class="finding">
+      <header>
+        <h3>Agent skills and tool definitions ingested from the internet</h3>
+        <p class="meta">RF-01 · owner: AppSec · related: freeware path, npm path · next action: short</p>
+        <p>Skills, prompts, tool definitions and MCP server configurations are fetched from public sources and loaded by agents at runtime. They are executable instructions that no SCA tool parses, they carry no signing or versioning convention, and they enter as content rather than as code — so every gate in this control is bypassed by construction. A malicious or manipulated skill can redirect an agent's behaviour, exfiltrate context, or invoke tools with the user's authority.</p>
+      </header>
+      <div class="treat">
+        <div class="th"></div><div class="th">Short</div><div class="th">Medium</div><div class="th">Long</div>
+
+        <div class="rl golden">Golden path<small>The supported way</small></div>
+        <div data-h="Short">Publish an interim allow-list of approved skills held in an internal repository, distributed manually. Crude, but it gives teams a correct answer to "where do I get this?" immediately.</div>
+        <div data-h="Medium">Internal skills marketplace: ingest published skills through a reviewed pipeline, version them, scan on ingest and periodically, sign the bundle, distribute from internal only. Agents configured to load from the marketplace exclusively.</div>
+        <div data-h="Long">Marketplace becomes the only reachable source. Skill bundles carry provenance attestations and are verified at load time, the same shape as artefact admission elsewhere in this control.</div>
+
+        <div class="rl detect">Identify outside the path<small>Who is not using it</small></div>
+        <div data-h="Short">OTel data from agent tooling: record which skills load, their content hash, and which tools they invoke. Start collecting before you can act on it — the baseline is the scarce thing.</div>
+        <div data-h="Medium">Reconcile loaded skill hashes against the marketplace catalogue; anything unrecognised raises a finding against a named owner. Egress monitoring for traffic to public skill sources.</div>
+        <div data-h="Long">Unrecognised skill loads blocked at the agent runtime rather than reported after the fact.</div>
+
+        <div class="rl mitig">General mitigations<small>For what we cannot reach</small></div>
+        <div data-h="Short">Sandboxed execution; least-privilege tool scopes; no standing credential access from agent contexts; human confirmation for high-impact tool calls.</div>
+        <div data-h="Medium">Injection guardrails on skill content and agent input; data-loss controls on agent egress; allow-listed MCP endpoints at the network layer.</div>
+        <div data-h="Long">Retained permanently as defence in depth. Skill ingress cannot be fully prevented, so these controls do not expire when the golden path lands.</div>
+
+        <div class="rl mvp">MVP / proof of value<small>Where nothing exists yet</small></div>
+        <div data-h="Short">Prompt-injection and malicious-instruction scanning of skill content at ingest. No mature tooling exists — run it as a pilot with an explicit accuracy threshold and a kill criterion.</div>
+        <div data-h="Medium">Signing and provenance for skill bundles, reusing the in-toto attestation model already in this control rather than inventing a format. Pilot on one agent platform.</div>
+        <div data-h="Long">Graduate what worked into the marketplace; retire what did not, with the decision recorded.</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <p><strong>What this example illustrates.</strong> Agent skills are a new instance of an old pattern in this control: <em>executable content arriving outside the artefact path</em>. npm lifecycle scripts, Python sdists, CI plugins and document macros are the same shape — content that runs, entering through a channel built for data. When a new finding matches a pattern already in the control, say so explicitly. It usually means the treatments transfer, and it stops each new technology being approached as though it were unprecedented.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Findings register</h2>
+      <p>The portfolio view. Coverage columns show which treatments are populated, so the gaps read at a glance without opening each finding.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>Seeded from findings already identified in the path layers. Coverage marks whether a treatment has a defined action, not whether it is complete.</caption>
+      <thead><tr><th scope="col">Finding</th><th scope="col">Path</th><th scope="col">Golden</th><th scope="col">Detect</th><th scope="col">Mitigate</th><th scope="col">MVP</th><th scope="col">Next</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">RF-01 Agent skills from the internet</th><td>Cross-cutting</td><td class="build">Planned</td><td class="build">Planned</td><td class="live">Yes</td><td class="build">Piloting</td><td>Short</td></tr>
+        <tr><th scope="row">RF-02 npm lifecycle scripts execute at install</th><td>npm</td><td class="live">Yes</td><td class="live">Yes</td><td class="live">Yes</td><td class="none">n/a</td><td>Short</td></tr>
+        <tr><th scope="row">RF-03 Persistent self-hosted runners break isolation</th><td>Base control</td><td class="live">Yes</td><td class="build">Partial</td><td class="seam">Weak</td><td class="none">n/a</td><td>Medium</td></tr>
+        <tr><th scope="row">RF-04 Digest-to-instance map missing</th><td>Base control</td><td class="build">Planned</td><td class="gapc">None</td><td class="seam">Pull telemetry only</td><td class="none">n/a</td><td>Short</td></tr>
+        <tr><th scope="row">RF-05 Shaded jars destroy composition</th><td>Java</td><td class="live">Yes</td><td class="build">Partial</td><td class="seam">Binary analysis</td><td class="none">n/a</td><td>Medium</td></tr>
+        <tr><th scope="row">RF-06 Vendor auto-update into production</th><td>Vendor</td><td class="live">Yes</td><td class="gapc">None</td><td class="build">Partial</td><td class="none">n/a</td><td>Short</td></tr>
+        <tr><th scope="row">RF-07 Unvetted tooling on build agents</th><td>Freeware</td><td class="build">Planned</td><td class="gapc">None</td><td class="seam">Weak</td><td class="none">n/a</td><td>Short</td></tr>
+        <tr><th scope="row">RF-08 Forks misreported as upstream versions</th><td>Source</td><td class="build">Planned</td><td class="gapc">None</td><td class="seam">Manual</td><td class="none">n/a</td><td>Medium</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note">
+      <p><strong>Read the Detect column first.</strong> Five of eight findings have no way to identify who is outside the path. That single column is a better statement of the control's current maturity than any count of implemented controls, and it is the argument for investing in inventory and telemetry ahead of new gates. A gate without detection only constrains the people who were already compliant.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Using the model</h2>
+    </div>
+    <div class="base">
+      <div><h3>One finding, one grid</h3><p>Keep the four-by-three shape even when cells are empty. The empty cell is the point — it is a claim about what we currently cannot do, made visible.</p></div>
+      <div><h3>Mitigations expire</h3><p>Short-term mitigations get a review date. Still primary at the long horizon means the plan failed, which is a finding in itself rather than a status update.</p></div>
+      <div><h3>MVPs need a kill criterion</h3><p>Stated accuracy or value threshold and a decision date at the start. Pilots without one become permanent half-deployments that nobody will end.</p></div>
+      <div><h3>Detection before enforcement</h3><p>Enforcing a path you cannot measure punishes the visible and misses the rest. Sequence detection first wherever the choice exists.</p></div>
+      <div><h3>Match new findings to known patterns</h3><p>Most new technologies present an existing pattern in new clothing. Naming the pattern transfers the treatments and shortens the analysis.</p></div>
+      <div><h3>Register is the review artefact</h3><p>The grids are for working; the register is what goes to governance. Coverage columns, not progress percentages — they are harder to game and more honest.</p></div>
+    </div>
+  </section>
+
+</div><!-- /layer-findings -->
+
 <footer>
-  <p>Document v6 — adds the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v7 — adds the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
