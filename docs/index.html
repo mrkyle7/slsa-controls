@@ -221,9 +221,10 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-vendor" data-layer="vendor" aria-controls="layer-vendor" aria-selected="false">Vendor binaries</button>
   <button role="tab" id="tab-freeware" data-layer="freeware" aria-controls="layer-freeware" aria-selected="false">Freeware &amp; shareware</button>
   <button role="tab" id="tab-source" data-layer="source" aria-controls="layer-source" aria-selected="false">Source &amp; forks</button>
+  <button role="tab" id="tab-desktop" data-layer="desktop" aria-controls="layer-desktop" aria-selected="false">SDKs, IDEs &amp; plugins</button>
   <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v7</span>
+  <span class="vpill">v8</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1576,8 +1577,148 @@ footer p{font-size:.8rem}
 
 </div><!-- /layer-findings -->
 
+
+<div class="layer" id="layer-desktop" data-layer="desktop" role="tabpanel" aria-labelledby="tab-desktop" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Path: SDKs, IDEs and plugins</h2>
+      <p>Developer desktop binaries — language SDKs and toolchains, IDEs, and the plugin ecosystems that extend them.</p>
+    </div>
+    <p style="font-size:.92rem">Two things make this path different from anything else in the control. <strong>The toolchain is a build input</strong>: a compromised SDK compromises every artefact built with it, and the SLSA model treats the builder's own dependencies as part of the trust boundary for exactly that reason. And <strong>IDE plugins execute with developer privilege</strong> — with access to source, credentials, cloud tokens and SSH keys — while being installed from marketplaces with weak publisher verification, on auto-update, with no pipeline anywhere in sight.</p>
+    <div class="note">
+      <p><strong>Where this sits relative to the other layers.</strong> The freeware path covers unmanaged tools generally; this path covers the specific population that participates in producing software. That distinction matters because these binaries sit inside the boundary that Build L2 and L3 claims depend on. An IDE plugin with repository write access is closer to the source-integrity controls than to endpoint management, even though it is installed like any other desktop app.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Three populations, three problems</h2>
+    </div>
+    <div class="eco">
+
+      <div class="ecocard">
+        <h3>SDKs and toolchains <span>JDK · .NET · Node · Go · mobile</span></h3>
+        <dl>
+          <dt>Why it matters</dt><dd>The compiler is a build input. Its identity belongs in provenance, and its compromise is undetectable by scanning the output.</dd>
+          <dt>Where it runs</dt><dd>Both desktop and build agents — the same artefact in two very different trust contexts.</dd>
+          <dt>Control</dt><dd>Mirror internally, pin by digest, distribute a curated set. The golden toolchain, directly analogous to the golden base image.</dd>
+          <dt>Licence exposure</dt><dd>Real and frequently missed. Some runtime and SDK distributions carry commercial terms that changed after adoption; the free alternative is usually equivalent but the switch must be deliberate.</dd>
+        </dl>
+        <p class="risk"><b>Path-specific risk:</b> toolchain version sprawl. When every project pins a different SDK build, the population to patch is unbounded and the provenance is inconsistent. Curation is the control.</p>
+      </div>
+
+      <div class="ecocard">
+        <h3>IDEs <span>desktop applications</span></h3>
+        <dl>
+          <dt>Why it matters</dt><dd>Holds credentials, source, and increasingly agent tooling with tool-invocation authority.</dd>
+          <dt>Where it runs</dt><dd>Developer endpoints, and in remote-development configurations also on servers holding source.</dd>
+          <dt>Control</dt><dd>Managed distribution, version floor enforced, auto-update through the internal mirror rather than the vendor.</dd>
+          <dt>Licence exposure</dt><dd>Commercial IDE licensing is usually well managed; the free-for-non-commercial editions are where exposure appears.</dd>
+        </dl>
+        <p class="risk"><b>Path-specific risk:</b> local builds. An artefact built on a laptop has no provenance, no gate and no record. This is less an IDE problem than a policy one, but the IDE is where it happens.</p>
+      </div>
+
+      <div class="ecocard">
+        <h3>Plugins and extensions <span>marketplaces</span></h3>
+        <dl>
+          <dt>Why it matters</dt><dd>Arbitrary code, developer privilege, minimal review, silent auto-update. The weakest link on this path by a clear margin.</dd>
+          <dt>Where it runs</dt><dd>Inside the IDE, with whatever the IDE can reach — which is everything the developer can reach.</dd>
+          <dt>Control</dt><dd>Internal marketplace or allow-list; publisher verification; version pinning; telemetry on what is actually installed.</dd>
+          <dt>Licence exposure</dt><dd>Highly variable and frequently unstated. Many are hobby projects with no licence at all.</dd>
+        </dl>
+        <p class="risk"><b>Path-specific risk:</b> typosquatted and impersonating extensions. Marketplace naming is weakly policed, popular extension names are imitated, and installation is a single click from a search result.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Lifecycle walk</h2></div>
+    <div class="scroller">
+    <table>
+      <caption>Control at each stage. Note that this path feeds into every other path's build stage.</caption>
+      <thead><tr><th scope="col">Stage</th><th scope="col">Control</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Catalogue</th>
+          <td class="build">Curated set of supported SDK versions, IDEs and approved extensions, each with an owner and a review date</td>
+          <td class="seam">Curation is the whole control here. An unbounded population cannot be patched, inventoried or reasoned about.</td>
+        </tr>
+        <tr>
+          <th scope="row">Ingress</th>
+          <td class="build">Downloaded once from the official source, signature and hash verified, mirrored internally and pinned</td>
+          <td>Same shape as base images. The mirror is what makes the version floor enforceable later.</td>
+        </tr>
+        <tr>
+          <th scope="row">Distribution</th>
+          <td class="build">Deployed through endpoint management from the internal mirror; direct marketplace and vendor download restricted</td>
+          <td class="seam">Without the network restriction the catalogue is advisory, exactly as on the freeware path.</td>
+        </tr>
+        <tr>
+          <th scope="row">Update</th>
+          <td class="gapc">Auto-update pointed at the internal mirror, or disabled; updates reviewed before republication</td>
+          <td class="seam">Marketplace auto-update is an unreviewed ingress channel into the development boundary — the same failure as vendor auto-update into production.</td>
+        </tr>
+        <tr>
+          <th scope="row">Use</th>
+          <td class="build">Credential scope limited; egress monitored, particularly for extensions that transmit code to external services</td>
+          <td>AI assistant extensions are the current growth area here and deserve their own assessment rather than blanket approval.</td>
+        </tr>
+        <tr>
+          <th scope="row">Build participation</th>
+          <td class="build">Toolchain identity and version recorded in build provenance; build agents restricted to the curated set</td>
+          <td class="seam">This is what connects the path to the rest of the control. An unrecorded toolchain is a gap in the provenance, not just an inventory gap.</td>
+        </tr>
+        <tr>
+          <th scope="row">Review</th>
+          <td class="build">Version floors raised on a schedule; extensions re-reviewed; abandoned ones removed</td>
+          <td>Extension abandonment is silent, as on the freeware path.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Risks and gaps</h2></div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">D1</span><h3>Compromised toolchain</h3><p>A malicious or tampered SDK injects into everything it builds, and no amount of scanning the output reliably detects it. Historic precedent exists for exactly this, distributed through unofficial mirrors of a popular IDE.</p><p class="owner">Fix: internal mirror, digest pinning, signature verification at ingest, and toolchain identity recorded in provenance.</p></div>
+      <div class="seamcard"><span class="id">D2</span><h3>Extensions with full developer authority</h3><p>An extension can read source, exfiltrate credentials, modify code before commit, and invoke agent tooling. Marketplace review is not a security control.</p><p class="owner">Fix: allow-list with publisher verification; pinned versions; installed-extension telemetry reconciled against it.</p></div>
+      <div class="seamcard"><span class="id">D3</span><h3>Silent auto-update inside the boundary</h3><p>A trusted extension becomes malicious at version n+1 through publisher account compromise or sale of the project, and updates arrive without review.</p><p class="owner">Fix: updates flow through the internal mirror; a version change is a reviewable event, not a background task.</p></div>
+      <div class="seamcard"><span class="id">D4</span><h3>Typosquatted extensions</h3><p>Impersonating names and inflated install counts make the wrong choice a single click from a search result.</p><p class="owner">Fix: developers install from the internal catalogue, not from marketplace search.</p></div>
+      <div class="seamcard"><span class="id">D5</span><h3>Local builds reaching production</h3><p>An artefact built on a laptop has no provenance, no gate and no record, yet can be pushed to a registry by anyone with credentials.</p><p class="owner">Fix: registry write restricted to build platform identities. This is a registry permission, and it is the single most effective control on this path.</p></div>
+      <div class="seamcard"><span class="id">D6</span><h3>Toolchain sprawl</h3><p>Dozens of SDK builds in use means an unbounded patch population and inconsistent provenance across the estate.</p><p class="owner">Fix: curated set with a version floor; projects pin within it rather than to arbitrary builds.</p></div>
+      <div class="seamcard"><span class="id">D7</span><h3>Code egress via assistant extensions</h3><p>Extensions that send source to external services for completion or analysis move code outside the bank as a routine part of their operation.</p><p class="owner">Fix: assess each one explicitly against data handling requirements; approve the endpoint, not just the extension.</p></div>
+      <div class="seamcard"><span class="id">D8</span><h3>Licence drift in runtimes</h3><p>Distribution terms for some widely used runtimes have changed materially after organisations adopted them, creating commercial exposure with no technical signal.</p><p class="owner">Fix: licence position reviewed per distribution at catalogue entry and on major version changes.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Where this path is heading</h2>
+      <p>The long-horizon answer changes the shape of the problem rather than tightening the existing controls.</p>
+    </div>
+    <div class="base">
+      <div><h3>Managed development environments</h3><p>Ephemeral, centrally defined workspaces — container-based or remote — make the toolchain a versioned, inspectable artefact rather than the state of someone's laptop. They also remove the local-build problem by construction.</p></div>
+      <div><h3>Devcontainer definitions as code</h3><p>Toolchain and extension set declared in the repository, reviewed like any other change, and reproducible. This is the same move as pinning base images, applied to the development environment.</p></div>
+      <div><h3>Build agents converge with desktops</h3><p>Once both draw from the same curated toolchain set, the provenance story becomes consistent and the patch population becomes finite.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>First three moves</h2></div>
+    <div class="base">
+      <div><h3>1. Restrict registry write to build platform identities</h3><p>Closes the local-build route to production. One permission change, and it does more than any desktop control on this list.</p></div>
+      <div><h3>2. Inventory installed extensions</h3><p>Reconciled against an allow-list. Expect the first run to be uncomfortable, and expect to find AI assistant extensions nobody assessed.</p></div>
+      <div><h3>3. Mirror and pin the toolchain set</h3><p>Then record toolchain identity in build provenance, which turns a desktop hygiene exercise into part of the verification chain.</p></div>
+    </div>
+  </section>
+
+</div><!-- /layer-desktop -->
+
 <footer>
-  <p>Document v7 — adds the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v8 — adds the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
