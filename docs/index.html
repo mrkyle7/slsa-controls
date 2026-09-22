@@ -224,7 +224,7 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-desktop" data-layer="desktop" aria-controls="layer-desktop" aria-selected="false">SDKs, IDEs &amp; plugins</button>
   <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v8</span>
+  <span class="vpill">v9</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1601,7 +1601,7 @@ footer p{font-size:.8rem}
         <h3>SDKs and toolchains <span>JDK · .NET · Node · Go · mobile</span></h3>
         <dl>
           <dt>Why it matters</dt><dd>The compiler is a build input. Its identity belongs in provenance, and its compromise is undetectable by scanning the output.</dd>
-          <dt>Where it runs</dt><dd>Both desktop and build agents — the same artefact in two very different trust contexts.</dd>
+          <dt>Where it runs</dt><dd class="seam">Two installs of the same artefact: on build agents, and on every developer desktop where it compiles and runs code locally. Different trust contexts, different patch populations, usually different versions.</dd>
           <dt>Control</dt><dd>Mirror internally, pin by digest, distribute a curated set. The golden toolchain, directly analogous to the golden base image.</dd>
           <dt>Licence exposure</dt><dd>Real and frequently missed. Some runtime and SDK distributions carry commercial terms that changed after adoption; the free alternative is usually equivalent but the switch must be deliberate.</dd>
         </dl>
@@ -1680,6 +1680,54 @@ footer p{font-size:.8rem}
     </div>
   </section>
 
+<section>
+    <div class="sec-head">
+      <h2>The SDK on the desktop</h2>
+      <p>A local JDK, Python interpreter, Node runtime or Go toolchain is a desktop binary in its own right — installed, executed daily, and holding configuration that determines where code comes from. The build-agent copy gets the attention; the desktop copy is where most of the exposure actually sits.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>The same artefact, two contexts, different controls.</caption>
+      <thead><tr><th scope="col">Aspect</th><th scope="col">On the build agent</th><th scope="col">On the desktop</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Patching</th>
+          <td class="live">Rebuilt with the image on a cadence; population known and finite</td>
+          <td class="gapc">Patched only if endpoint management knows it exists. Version sprawl is the norm and the population is often unmeasured.</td>
+        </tr>
+        <tr>
+          <th scope="row">Install route</th>
+          <td class="live">Image definition, reviewed and pinned</td>
+          <td class="seam">Endpoint management, vendor download, package manager, or a version manager pulling straight from the internet</td>
+        </tr>
+        <tr>
+          <th scope="row">What it executes</th>
+          <td class="build">Pipeline-defined builds, isolated per job</td>
+          <td class="gapc">Whatever the developer runs: third-party build plugins, test suites, sample projects — arbitrary code with developer privilege, before CI ever sees it</td>
+        </tr>
+        <tr>
+          <th scope="row">Registry configuration</th>
+          <td class="live">Enforced to the internal proxy in the image</td>
+          <td class="gapc">Local config files decide. A default install points at public registries and bypasses ingress entirely.</td>
+        </tr>
+        <tr>
+          <th scope="row">Trust store</th>
+          <td class="live">Controlled in the image</td>
+          <td class="seam">Locally modifiable. Certificates get added and verification gets disabled to work around proxies, and both persist.</td>
+        </tr>
+        <tr>
+          <th scope="row">Output</th>
+          <td class="live">Attested artefacts with provenance</td>
+          <td class="gapc">Unattested local builds, indistinguishable from pipeline output once pushed</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note">
+      <p><strong>The point worth carrying into review.</strong> The desktop is where the ingress proxy is actually bypassed. Not maliciously — a developer installs a runtime, its default configuration points at the public registry, and dependencies flow in unscreened from that moment. Every control on the FOSS paths assumes resolution happens through the proxy, and on an unmanaged desktop that assumption is simply false. Fixing local registry configuration is unglamorous and does more for ingress coverage than most gate work.</p>
+    </div>
+  </section>
+
   <section>
     <div class="sec-head"><h2>Risks and gaps</h2></div>
     <div class="seams">
@@ -1689,6 +1737,10 @@ footer p{font-size:.8rem}
       <div class="seamcard"><span class="id">D4</span><h3>Typosquatted extensions</h3><p>Impersonating names and inflated install counts make the wrong choice a single click from a search result.</p><p class="owner">Fix: developers install from the internal catalogue, not from marketplace search.</p></div>
       <div class="seamcard"><span class="id">D5</span><h3>Local builds reaching production</h3><p>An artefact built on a laptop has no provenance, no gate and no record, yet can be pushed to a registry by anyone with credentials.</p><p class="owner">Fix: registry write restricted to build platform identities. This is a registry permission, and it is the single most effective control on this path.</p></div>
       <div class="seamcard"><span class="id">D6</span><h3>Toolchain sprawl</h3><p>Dozens of SDK builds in use means an unbounded patch population and inconsistent provenance across the estate.</p><p class="owner">Fix: curated set with a version floor; projects pin within it rather than to arbitrary builds.</p></div>
+      <div class="seamcard"><span class="id">D9</span><h3>Shadow toolchain managers</h3><p>Version managers install runtimes straight from the internet, outside endpoint management and outside the mirror. The result is toolchains nobody inventoried on machines holding source and credentials.</p><p class="owner">Fix: point version managers at the internal mirror where they support it; detect unmanaged runtime installs through endpoint inventory.</p></div>
+      <div class="seamcard"><span class="id">D10</span><h3>Local registry configuration</h3><p>Default runtime configuration resolves from public registries. Every dependency pulled on a developer machine then bypasses ingress screening completely.</p><p class="owner">Fix: managed configuration profiles distributed with the toolchain; network restriction so the public registries are unreachable regardless of local config.</p></div>
+      <div class="seamcard"><span class="id">D11</span><h3>Trust store modification</h3><p>Certificates added and TLS verification disabled to work around proxy issues, then left in place indefinitely. This silently removes the integrity guarantee that package checksums and signatures depend on.</p><p class="owner">Fix: make the supported proxy path work properly, then detect modified trust stores and disabled verification flags.</p></div>
+      <div class="seamcard"><span class="id">D12</span><h3>Desktop patch population invisible</h3><p>The build image JDK is patched on a cadence; the desktop JDK on several thousand machines may be years behind, and it is executing untrusted third-party code daily.</p><p class="owner">Fix: inventory runtimes as first-class desktop software with version floors enforced, not as developer preference.</p></div>
       <div class="seamcard"><span class="id">D7</span><h3>Code egress via assistant extensions</h3><p>Extensions that send source to external services for completion or analysis move code outside the bank as a routine part of their operation.</p><p class="owner">Fix: assess each one explicitly against data handling requirements; approve the endpoint, not just the extension.</p></div>
       <div class="seamcard"><span class="id">D8</span><h3>Licence drift in runtimes</h3><p>Distribution terms for some widely used runtimes have changed materially after organisations adopted them, creating commercial exposure with no technical signal.</p><p class="owner">Fix: licence position reviewed per distribution at catalogue entry and on major version changes.</p></div>
     </div>
@@ -1711,14 +1763,14 @@ footer p{font-size:.8rem}
     <div class="base">
       <div><h3>1. Restrict registry write to build platform identities</h3><p>Closes the local-build route to production. One permission change, and it does more than any desktop control on this list.</p></div>
       <div><h3>2. Inventory installed extensions</h3><p>Reconciled against an allow-list. Expect the first run to be uncomfortable, and expect to find AI assistant extensions nobody assessed.</p></div>
-      <div><h3>3. Mirror and pin the toolchain set</h3><p>Then record toolchain identity in build provenance, which turns a desktop hygiene exercise into part of the verification chain.</p></div>
+      <div><h3>3. Mirror and pin the toolchain set</h3><p>For desktops as well as agents, with managed registry configuration shipped alongside it. Then record toolchain identity in build provenance, which turns a desktop hygiene exercise into part of the verification chain.</p></div>
     </div>
   </section>
 
 </div><!-- /layer-desktop -->
 
 <footer>
-  <p>Document v8 — adds the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v9 — expands the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
