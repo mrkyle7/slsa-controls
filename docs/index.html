@@ -225,7 +225,7 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-javaroute" data-layer="javaroute" aria-controls="layer-javaroute" aria-selected="false">Java route (practical)</button>
   <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v10</span>
+  <span class="vpill">v11</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -1776,18 +1776,96 @@ footer p{font-size:.8rem}
   <section style="margin-top:28px">
     <div class="sec-head">
       <h2>Java application route — practical</h2>
-      <p>The concrete version: Jenkins and mixed CI, Nexus as repository and proxy, applications running across internal Kubernetes and OpenShift, public cloud managed services, and VMs. Current state, target state, and the sequence between them.</p>
+      <p>DevX pipelines orchestrating Jenkins and other build technologies, a SLSA signing agent already in place, an SBOM inventory being stood up, Nexus as repository and proxy, and applications running across internal Kubernetes and OpenShift, cloud managed services and VMs.</p>
     </div>
     <div class="note">
-      <p><strong>Assumptions to correct before this circulates.</strong> Maven and Gradle builds; a static analysis and quality-gate platform already wired into Jenkins; some SCA coverage today; no artefact signing and no SBOM of record today; Jenkins using long-lived shared agents; deployment driven from Jenkins or a separate CD tool depending on the team. Where any of these is wrong the target does not change, but the starting rung does.</p>
+      <p><strong>This is further along than a standing start.</strong> Three capabilities already exist that most of this control assumes have to be built: an orchestration layer above the build technologies, a signing agent, and an SBOM store. The work is less about creating them than about making them meet the specific requirements that turn them into a verification chain — and in two places the difference between what exists and what SLSA requires is narrow but decisive.</p>
     </div>
-    <p style="font-size:.92rem"><strong>The headline finding.</strong> Jenkins with shared agents sits at <strong>Build L1</strong>. Provenance produced by a pipeline step is produced by a tenant, not by a control plane, so it does not meet L2's authenticity requirement no matter how well the pipeline is written. Moving to L2 means a signing path the build steps cannot reach; L3 additionally means an ephemeral agent per build. Both are achievable on Jenkins, and neither is a configuration change.</p>
+    <p style="font-size:.92rem">Remaining assumptions to correct: Maven and Gradle; static analysis and quality gates already in the pipelines; some SCA coverage; deployment driven from the pipelines or a separate CD tool depending on team.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>The orchestration layer is the opportunity</h2>
+      <p>DevX sitting above Jenkins and the other build technologies is the most useful structural fact on this route. It is the natural home for the control plane, and it makes the mixed-CI problem tractable instead of multiplying it.</p>
+    </div>
+    <div class="base">
+      <div><h3>Why it helps</h3><p>SLSA requires provenance generated in a trusted control plane rather than by the tenant. An orchestrator already holds the facts worth attesting — what source it resolved, what parameters it set, which executor it dispatched to — and holds them outside the job's reach. That is exactly the position a control plane needs to occupy.</p></div>
+      <div><h3>The trap to avoid</h3><p class="seam">If the orchestrator assembles provenance from what the job reports back, the provenance is tenant-influenced and the L2 claim does not hold. It must attest what it dispatched and observed, not what the build told it afterwards.</p></div>
+      <div><h3>Builder identity</h3><p>A single DevX identity across heterogeneous executors breaks the rule that one <code>builder.id</code> must mean one set of security attributes. Use a composite: orchestrator plus executor class, so an ephemeral Kubernetes agent and a shared static agent are distinguishable to a verifier.</p></div>
+      <div><h3>The level is the executor's</h3><p>Orchestration does not raise the level of what it orchestrates. A hardened control plane dispatching to a shared mutable agent still yields an artefact built without isolation. The orchestrator can attest honestly to that — which is the point.</p></div>
+      <div><h3>What it makes possible</h3><p>One provenance format and one signing path across every build technology, including the ones nobody wants to migrate. This is the reason the mixed estate stops being an obstacle.</p></div>
+      <div><h3>Where it does not reach</h3><p>Builds that bypass the orchestrator entirely. Those need finding, and they default to L0 with their artefacts confined to the protected repository path.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Signing agent — the questions that decide the level</h2>
+      <p>A signing agent is the hard part of L2 already solved, or almost. Which of the two depends on a handful of design details, and each one is the difference between authentic provenance and provenance that merely looks authentic.</p>
+    </div>
+    <div class="scroller">
+    <table>
+      <caption>What to verify about the existing agent before claiming Build L2.</caption>
+      <thead><tr><th scope="col">Question</th><th scope="col">Why it decides the level</th><th scope="col">If the answer is wrong</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Does it generate provenance, or sign what it is handed?</th>
+          <td class="seam">Signing a document a build step composed makes the signature authentic and the content forgeable. The requirement is that the control plane generates the fields.</td>
+          <td>Move field generation into the agent or the orchestrator; accept build-supplied values only for fields not required at L2.</td>
+        </tr>
+        <tr>
+          <th scope="row">Can a build step reach the key?</th>
+          <td class="live">L2 requires the key to be held by the platform; L3 requires it to be unreachable from anything running user-defined steps.</td>
+          <td>Key moves behind the agent as a service; jobs call it, never hold it.</td>
+        </tr>
+        <tr>
+          <th scope="row">How does it authenticate the caller?</th>
+          <td class="seam">A shared secret available inside a job means any job can request a signature for any artefact, including one it did not build.</td>
+          <td>Workload identity bound to the specific build, issued by the orchestrator rather than stored in the job.</td>
+        </tr>
+        <tr>
+          <th scope="row">Does it bind the signature to the artefact it saw?</th>
+          <td class="build">The subject digest must be the artefact actually produced, verified by the agent, not asserted by the caller.</td>
+          <td>Agent computes the digest itself, or receives it over a channel the job cannot influence.</td>
+        </tr>
+        <tr>
+          <th scope="row">One identity or many?</th>
+          <td class="build">The signer-and-builder pair is what a verifier trusts. One key signing for every executor class erases the distinction between them.</td>
+          <td>Distinct builder identities in the provenance even where the signing key is shared.</td>
+        </tr>
+        <tr>
+          <th scope="row">Is there a transparency log or timestamp?</th>
+          <td class="none">Recommended rather than required, but it is what lets you detect misuse of the key after the fact.</td>
+          <td>Add an internal log; it does not need to be public to be useful.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note">
+      <p><strong>The one to check first.</strong> Whether the agent generates or merely signs. It is the most common way a signing capability delivers L1 assurance while being described as L2, and it is much cheaper to correct now than after verification is depending on it.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>SBOM inventory — making stage SBOMs into a record</h2>
+      <p>Storing SBOMs at each stage is the right shape. What turns a collection into evidence is designating which one is authoritative and keeping the lineage between them.</p>
+    </div>
+    <div class="base">
+      <div><h3>Designate the authoritative one</h3><p class="seam">Advisory matching runs against the build-time resolved SBOM, generated pre-shade. Source-stage and image-stage SBOMs are useful context, but if all stages are equal then an incident starts with an argument about which one to believe.</p></div>
+      <div><h3>Key everything to the digest</h3><p>Stage SBOMs describe the same artefact at different moments. Without a common artefact identity they cannot be reconciled, and reconciliation is what makes the shade problem visible.</p></div>
+      <div><h3>Reconciliation is a control, not a report</h3><p>A build-stage SBOM that disagrees with the artefact-stage one is telling you something happened in between — shading, repackaging, an unexpected dependency. Diff them deliberately.</p></div>
+      <div><h3>Retention outlives the artefact</h3><p>The blast-radius question gets asked about things deployed years ago. Set retention by evidence need, not by storage cost, and check the cleanup policies now rather than after the first deletion.</p></div>
+      <div><h3>It is the CVE clock's foundation</h3><p>Continuous re-matching runs against this store. Once it holds build-stage SBOMs keyed to digests, the clock becomes implementable without any further tooling decision.</p></div>
+      <div><h3>The missing half</h3><p class="gapc">The inventory answers "what is in this artefact". The unanswered question is "where is this artefact running" — the digest-to-instance index. That gap, not the SBOM side, is what currently blocks blast radius.</p></div>
+    </div>
   </section>
 
   <section>
     <div class="sec-head">
       <h2>Stage by stage</h2>
-      <p>The central view: what exists now, what the target is, and which SLSA requirement the target satisfies.</p>
+      <p>Revised for what already exists. Green cells are capabilities in place or narrowly within reach.</p>
     </div>
     <div class="scroller">
     <table>
@@ -1796,65 +1874,79 @@ footer p{font-size:.8rem}
       <tbody>
         <tr>
           <th scope="row">Developer desktop</th>
-          <td class="gapc">Local JDK versions unmanaged; Maven settings frequently pointing at public repositories; local builds possible</td>
-          <td class="build">Curated JDK set from the internal mirror; managed settings.xml enforcing the Nexus group repo; registry write closed to humans</td>
-          <td class="none">Outside SLSA, but it determines whether ingress screening is real</td>
+          <td class="gapc">Local JDK versions unmanaged; Maven settings often resolving outside Nexus; local builds possible</td>
+          <td class="build">Curated JDK set from the internal mirror; managed settings.xml; Nexus write closed to humans</td>
+          <td class="none">Outside SLSA, but determines whether ingress screening is real</td>
           <td>Now</td>
         </tr>
         <tr>
           <th scope="row">Source</th>
-          <td class="build">Git with branch protection and review; commit signing inconsistent</td>
-          <td class="live">Branch protection, two-party review, signed commits enforced; history protected</td>
-          <td class="live">Source L2 estate-wide, Source L3 tier-one, L4 two-party review for tier-one</td>
+          <td class="build">Branch protection and review; commit signing inconsistent</td>
+          <td class="live">Two-party review, signed commits enforced, history protected</td>
+          <td class="live">Source L2 estate-wide; L3 and L4 for tier-one</td>
           <td>Now → Next</td>
         </tr>
         <tr>
           <th scope="row">Dependency ingress</th>
-          <td class="build">Nexus proxying Maven Central; coverage good but bypass possible from desktops and some agents</td>
-          <td class="live">Single group repo as the only resolvable source; direct Central blocked at the network; policy screening on proxy fetch; quarantine for unreviewed packages</td>
-          <td class="seam">Not a SLSA requirement — this is the S1 seam, proving the build consumed only what was screened</td>
+          <td class="build">Nexus proxying Central; bypass possible from desktops and unorchestrated builds</td>
+          <td class="live">Group repo the only resolvable source, Central blocked at the network, screening on fetch, quarantine for unreviewed packages</td>
+          <td class="seam">The S1 seam — proving the build consumed only what was screened</td>
           <td>Now</td>
         </tr>
         <tr>
-          <th scope="row">Build</th>
-          <td class="gapc">Jenkins, shared long-lived agents, pipeline-defined steps, no provenance emitted</td>
-          <td class="build">Provenance generated by a trusted Jenkins component, signed with a key held in the HSM or KMS and unreachable from build steps; ephemeral agent per build for tier-one</td>
-          <td class="build">Provenance Exists → Provenance is Authentic (L2) → Unforgeable and Isolated (L3)</td>
+          <th scope="row">Orchestration</th>
+          <td class="live">DevX pipelines dispatching to Jenkins and other build technologies</td>
+          <td class="live">Control plane: generates provenance from dispatch facts, composite builder identity per executor class</td>
+          <td class="build">Provenance is Authentic — generated by the platform, not the tenant</td>
+          <td>Now → Next</td>
+        </tr>
+        <tr>
+          <th scope="row">Build execution</th>
+          <td class="build">Mixed executors; isolation varies; shared agents likely in places</td>
+          <td class="build">Ephemeral agent per build for tier-one; executor classes registered with their trusted levels</td>
+          <td class="build">Isolated (L3) for tier-one; honest lower levels elsewhere</td>
           <td>Next → Later</td>
         </tr>
         <tr>
+          <th scope="row">Signing</th>
+          <td class="live">SLSA signing agent in place</td>
+          <td class="live">Agent generates the required fields, authenticates callers by workload identity, binds to a digest it verified</td>
+          <td class="live">Provenance is Authentic (L2); Unforgeable (L3) once keys are unreachable from build steps</td>
+          <td>Now — validate, then close gaps</td>
+        </tr>
+        <tr>
           <th scope="row">Code quality</th>
-          <td class="live">SAST and quality gates in the pipeline; results in the tool, not bound to the artefact</td>
-          <td class="build">Same scanners, results emitted as signed attestations against the artefact digest and evaluated by the gate</td>
-          <td class="none">Bank-defined predicates, carried on the in-toto model</td>
+          <td class="build">SAST and quality gates running; results held in the tools, not bound to artefacts</td>
+          <td class="build">Same scanners, results emitted as signed attestations against the digest and evaluated at promotion</td>
+          <td class="none">Bank-defined predicates on the in-toto model</td>
           <td>Next</td>
         </tr>
         <tr>
           <th scope="row">SBOM</th>
-          <td class="gapc">None of record</td>
-          <td class="live">CycloneDX plugin emitting from the resolved graph, before any shade step; stored against the digest and retained</td>
-          <td class="none">Prerequisite for the CVE clock, not a SLSA requirement itself</td>
+          <td class="build">Inventory started, stage SBOMs being stored</td>
+          <td class="live">Build-stage SBOM designated authoritative, pre-shade, keyed to digest, retained beyond artefact life, stages reconciled</td>
+          <td class="none">Prerequisite for the CVE clock</td>
           <td>Now</td>
         </tr>
         <tr>
           <th scope="row">Artefact</th>
-          <td class="build">Nexus hosted repositories; promotion by convention; no signing</td>
-          <td class="build">Signed jar and container image; provenance, SBOM and scan attestations stored against the digest; promotion between repositories is the gate</td>
-          <td class="build">Distribute provenance; verification at promotion issuing a VSA</td>
+          <td class="build">Nexus hosted repositories; promotion by convention</td>
+          <td class="build">Signed artefact; provenance, SBOM and scan attestations stored against the digest; promotion is the gate and issues the VSA</td>
+          <td class="build">Distribute provenance; verification at promotion</td>
           <td>Next</td>
         </tr>
         <tr>
           <th scope="row">Deploy</th>
-          <td class="gapc">Mixed and uneven: Kubernetes and OpenShift can enforce, cloud managed varies, VMs cannot</td>
-          <td class="build">Admission verification where the platform allows; elsewhere the Nexus repository path is the enforcement point</td>
-          <td class="build">Verifying artifacts — step 1 build level, step 2 expectations</td>
+          <td class="gapc">Uneven: Kubernetes and OpenShift can enforce, cloud managed varies, VMs cannot</td>
+          <td class="build">Admission verification where available; Nexus repository path as the universal enforcement point</td>
+          <td class="build">Verifying artifacts — build level, then expectations</td>
           <td>Next → Later</td>
         </tr>
         <tr>
           <th scope="row">Runtime</th>
-          <td class="gapc">Scanning of running estate partial; no digest-to-instance map</td>
-          <td class="build">Continuous re-match against stored SBOMs; digest-to-instance index across all three platform types</td>
-          <td class="none">The S5 seam and the CVE clock's blast-radius query</td>
+          <td class="gapc">No digest-to-instance map</td>
+          <td class="build">Continuous re-match against the SBOM inventory; digest-to-instance index across all three platform types</td>
+          <td class="none">The S5 seam and the blast-radius query</td>
           <td>Later</td>
         </tr>
       </tbody>
@@ -1863,36 +1955,21 @@ footer p{font-size:.8rem}
     <div class="keyrow">
       <span><i style="background:var(--gap)"></i>Gap today</span>
       <span><i style="background:var(--build)"></i>Partial or in progress</span>
-      <span><i style="background:var(--live)"></i>Working or achievable now</span>
+      <span><i style="background:var(--live)"></i>In place or within reach</span>
       <span><i style="background:var(--seam)"></i>Seam — no single owner</span>
     </div>
   </section>
 
   <section>
     <div class="sec-head">
-      <h2>The build ladder</h2>
-      <p>Where Jenkins sits, and what each rung actually costs. This is the part most likely to be argued about, so the reasoning matters more than the label.</p>
+      <h2>The build ladder, revised</h2>
+      <p>With an orchestrator and a signing agent, the gap to L2 is narrower than the usual Jenkins position — but it is a gap in specific properties, not in capability.</p>
     </div>
     <div class="clock">
-      <div class="clock-row"><div class="t">L1 — today</div><div class="d"><h3>Provenance exists</h3><p>Achievable immediately: emit provenance from the pipeline describing source, parameters and builder. It is forgeable by anyone who can edit a Jenkinsfile, and that is fine — L1 is about having the data, not trusting it. Do this first because it makes everything downstream testable.</p></div></div>
-      <div class="clock-row"><div class="t">L2 — the real work</div><div class="d"><h3>Provenance is authentic</h3><p>Requires generation and signing by a component the build steps cannot influence: a Jenkins plugin or sidecar service holding a key in the HSM or KMS, not credentials injected into the job. The common shortcut — signing inside the pipeline with a credential binding — does not meet the requirement, because a tenant-controlled step can then sign anything it likes.</p></div></div>
-      <div class="clock-row"><div class="t">L3 — tier-one</div><div class="d"><h3>Unforgeable and isolated</h3><p>Ephemeral agent per build, which the Kubernetes agent model gives you naturally, plus no shared mutable cache and full enumeration of external parameters. Shared long-lived agents fail the isolation requirement outright. Scope this to tier-one rather than the estate.</p></div></div>
-      <div class="clock-row"><div class="t">Mixed CI</div><div class="d"><h3>Every builder is a separate entry</h3><p>Each Jenkins controller, each agent class, and each other CI platform gets its own builder identity and its own trusted level. Anything unassessed defaults to L0 and its artefacts route to the protected repository path. This register is the root of trust for the whole route — build it early, because retrofitting it means re-verifying everything.</p></div></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="sec-head">
-      <h2>Nexus as the control point</h2>
-      <p>With deployment enforcement uneven across three platform types, the repository is the one chokepoint that covers everything. That makes Nexus load-bearing for this route.</p>
-    </div>
-    <div class="base">
-      <div><h3>One group repository</h3><p>Developers and agents resolve from a single group repo. Direct Central access blocked at the network so local configuration cannot route around it. This is what makes the S1 seam provable rather than assumed.</p></div>
-      <div><h3>Repositories as promotion paths</h3><p>Separate hosted repositories for candidate and released artefacts, with promotion permitted only by the verification service. This implements the standard and protected paths from the base layer without needing deployment control.</p></div>
-      <div><h3>Write access to build identities only</h3><p>Humans cannot publish. This single permission closes the local-build route to production and is the cheapest high-value control on the route.</p></div>
-      <div><h3>Where attestations live</h3><p class="seam">An open question worth deciding early. Options: alongside the artefact as additional Maven classifiers, in an OCI registry using referrers for container images, or in a dedicated attestation store. Mixed jar-and-image output probably means two mechanisms — decide deliberately rather than by accident.</p></div>
-      <div><h3>Retention</h3><p>SBOMs and attestations must outlive the artefact's active life, because the blast-radius query is asked about things deployed years ago. Cleanup policies tuned for disk will quietly destroy the evidence base.</p></div>
-      <div><h3>Proxy policy screening</h3><p>Screening on fetch, with quarantine for unreviewed packages, gives the ingress obligation model somewhere to live without blocking developers outright.</p></div>
+      <div class="clock-row"><div class="t">L1</div><div class="d"><h3>Provenance exists</h3><p>Reachable immediately through the orchestrator, for every build technology it dispatches to. This is the fastest way to get estate-wide coverage of anything.</p></div></div>
+      <div class="clock-row"><div class="t">L2</div><div class="d"><h3>Provenance is authentic</h3><p>Depends on two answers: the orchestrator generating fields from dispatch facts rather than job reports, and the agent authenticating callers per build rather than by shared secret. If both already hold, L2 is a documentation and verification exercise rather than an engineering one — which would be a genuinely strong position.</p></div></div>
+      <div class="clock-row"><div class="t">L3</div><div class="d"><h3>Unforgeable and isolated</h3><p>Two distinct requirements. Unforgeable is about key reachability and full enumeration of external parameters, and the agent may already satisfy it. Isolated is about the executor — ephemeral environment per build, no shared cache — and is scoped per executor class rather than estate-wide.</p></div></div>
+      <div class="clock-row"><div class="t">Registry</div><div class="d"><h3>Executor classes, not platforms</h3><p>The trust register lists orchestrator-and-executor pairs with a trusted level each. Unorchestrated builds default to L0. This register is the root of trust for the route and should be versioned alongside the control.</p></div></div>
     </div>
   </section>
 
@@ -1905,64 +1982,64 @@ footer p{font-size:.8rem}
       <caption>Enforcement capability by platform, and what to do where it is absent.</caption>
       <thead><tr><th scope="col">Platform</th><th scope="col">Enforcement available</th><th scope="col">Approach</th></tr></thead>
       <tbody>
-        <tr><th scope="row">Kubernetes / OpenShift</th><td class="live">Admission control can verify signature and VSA before a pod runs</td><td>Full gate. Start here — it is also where the pattern is easiest to demonstrate to governance.</td></tr>
-        <tr><th scope="row">Public cloud managed</th><td class="build">Varies by service; some support image verification, some do not</td><td>Assess per service. Where verification is unavailable, rely on the repository path plus deployment pipeline checks.</td></tr>
-        <tr><th scope="row">VMs and app servers</th><td class="gapc">No admission concept; artefacts are fetched and run</td><td class="seam">Repository path is the only enforcement. Verified artefacts in the released repository, unverified ones unreachable to those hosts.</td></tr>
+        <tr><th scope="row">Kubernetes / OpenShift</th><td class="live">Admission control can verify signature and VSA before a pod runs</td><td>Full gate. Start here — easiest to demonstrate and the pattern generalises.</td></tr>
+        <tr><th scope="row">Public cloud managed</th><td class="build">Varies by service</td><td>Assess per service; fall back to repository path plus pipeline checks.</td></tr>
+        <tr><th scope="row">VMs and app servers</th><td class="gapc">No admission concept</td><td class="seam">Repository path is the only enforcement. Verified artefacts in the released repository; unverified ones unreachable.</td></tr>
       </tbody>
     </table>
     </div>
     <div class="note">
-      <p><strong>This is why the promotion-path model matters for Java specifically.</strong> Two of the three platform types cannot enforce at deploy time. If the gate lived only at admission, most of the Java estate would be ungoverned. Putting it at promotion into the released repository covers all three, and the platforms that can verify at admission then act as a second check rather than the only one.</p>
+      <p><strong>Why promotion is the gate for Java.</strong> Two of three platform types cannot enforce at deploy time. Gating at promotion into the released Nexus repository covers all three; admission then acts as a second check rather than the only one.</p>
     </div>
   </section>
 
   <section>
     <div class="sec-head">
-      <h2>Sequence</h2>
-      <p>Ordered so each phase makes the next one possible, and so the early work produces evidence that justifies the later investment.</p>
+      <h2>Sequence, revised</h2>
+      <p>The existing capabilities move work earlier. The first phase is now largely validation and connection rather than construction.</p>
     </div>
     <div class="clock">
-      <div class="clock-row"><div class="t">Now<br><span class="mono" style="font-size:.66rem">0–3 months</span></div><div class="d"><h3>Make the evidence exist</h3><p>CycloneDX SBOM generation in the standard Maven and Gradle templates, pre-shade. L1 provenance from the pipeline. Nexus group repo as the only resolution path with Central blocked at the network. Managed settings.xml and a curated JDK set. Registry write restricted to build identities. None of this needs the L2 work, and all of it is prerequisite to it.</p></div></div>
-      <div class="clock-row"><div class="t">Next<br><span class="mono" style="font-size:.66rem">3–9 months</span></div><div class="d"><h3>Make the evidence trustworthy</h3><p>Control-plane signing for provenance — the L2 step. Builder trust register covering every Jenkins controller and the other CI platforms. Scan results emitted as attestations bound to the digest. Verification service at promotion issuing VSAs. Candidate and released repositories separated, with promotion restricted to the verification service. Admission verification enabled on Kubernetes and OpenShift.</p></div></div>
-      <div class="clock-row"><div class="t">Later<br><span class="mono" style="font-size:.66rem">9–18 months</span></div><div class="d"><h3>Close the loop</h3><p>Ephemeral agents for tier-one, reaching L3. Digest-to-instance index across all three platform types, which turns on the CVE clock properly. Call-graph reachability feeding VEX. Cloud managed services assessed and verifying where supported. Source L4 two-party review for tier-one.</p></div></div>
-      <div class="clock-row"><div class="t">Throughout</div><div class="d"><h3>Measure coverage, not completion</h3><p>Percentage of Java builds emitting an SBOM; percentage with authentic provenance; percentage of the running estate resolvable to a verified digest. These three numbers describe the route's real state better than any phase status, and they are what the later investment is argued from.</p></div></div>
+      <div class="clock-row"><div class="t">Now<br><span class="mono" style="font-size:.66rem">0–3 months</span></div><div class="d"><h3>Validate and connect what exists</h3><p>Answer the six signing-agent questions and write down the honest level. Define composite builder identities and stand up the trust register. Designate the build-stage SBOM as authoritative and key the inventory to digests. Fix retention before anything ages out. Close the desktop ingress bypass: managed settings.xml, curated JDKs, Nexus write restricted to build identities.</p></div></div>
+      <div class="clock-row"><div class="t">Next<br><span class="mono" style="font-size:.66rem">3–9 months</span></div><div class="d"><h3>Turn evidence into a gate</h3><p>Orchestrator generates provenance for every dispatch, signed per build. Scan results emitted as attestations bound to the digest. Verification service at promotion issuing VSAs, with candidate and released repositories separated. Admission verification on Kubernetes and OpenShift. Find and enumerate unorchestrated builds.</p></div></div>
+      <div class="clock-row"><div class="t">Later<br><span class="mono" style="font-size:.66rem">9–18 months</span></div><div class="d"><h3>Close the loop</h3><p>Ephemeral executors for tier-one to reach L3. Digest-to-instance index across all three platform types, which switches the CVE clock on properly. Call-graph reachability feeding VEX. Cloud managed services verifying where supported. Source L4 for tier-one.</p></div></div>
+      <div class="clock-row"><div class="t">Throughout</div><div class="d"><h3>Three coverage numbers</h3><p>Percentage of Java builds passing through the orchestrator; percentage with authentic signed provenance; percentage of the running estate resolvable to a verified digest. The first of those is new, and it is the one that tells you how much of the estate this route actually governs.</p></div></div>
     </div>
   </section>
 
   <section>
     <div class="sec-head">
       <h2>Where GUAC fits</h2>
-      <p>You asked whether this is GUAC. Partly — it solves one specific problem on this route well, and is not a substitute for the rest.</p>
+      <p>Narrower than before, because the SBOM inventory already covers part of what GUAC would have been adopted for.</p>
     </div>
     <div class="base">
-      <div><h3>What it would do here</h3><p>Ingest SBOMs and in-toto attestations from Jenkins, plus vulnerability data, into one graph with a queryable API. The blast-radius question — which artefacts and which deployments contain this component — is its stated use case, and it is the query this route currently cannot answer.</p></div>
-      <div><h3>What it does not do</h3><p>It does not generate provenance, sign anything, enforce a gate, or manage waivers. The L2 signing work, the verification service and the promotion controls are all still yours.</p></div>
-      <div><h3>Where it sits in the sequence</h3><p>It needs SBOMs and attestations to ingest, so it follows the Now phase rather than leading it. Standing it up before there is anything to feed it produces an empty graph and a disappointed stakeholder.</p></div>
-      <div><h3>How to evaluate it</h3><p>As an MVP in the findings model: a defined question it must answer, an accuracy threshold, and a decision date. The alternative is a query layer over the attestation store built in-house, which is viable but is a product commitment.</p></div>
-      <div><h3>The bank precedent</h3><p>It is an OpenSSF incubating project created in part by Citi, which is a useful reference point when the build-versus-adopt discussion reaches governance.</p></div>
-      <div><h3>The deciding question</h3><p>Whether the digest-to-instance index — the thing this route most lacks — is something GUAC can be fed from your deployment platforms. That is an integration question about your estate, not a question about GUAC.</p></div>
+      <div><h3>What it would still add</h3><p>Graph queries across SBOMs, attestations and advisories — transitive relationships, artefact-to-artefact lineage, and the blast-radius traversal that a flat SBOM store answers slowly or not at all.</p></div>
+      <div><h3>What it does not add</h3><p>It does not generate or sign provenance, enforce gates, or manage waivers. Those remain the orchestrator, agent and verification service.</p></div>
+      <div><h3>The real question now</h3><p class="seam">Whether the existing SBOM inventory should grow query capability, or feed a graph layer. That is an architecture decision about a system you already own, not a build-versus-buy decision from scratch.</p></div>
+      <div><h3>Deciding factor</h3><p>Whether the digest-to-instance index can be fed into the same store. If yes, the inventory becomes the answer to blast radius on its own and GUAC is optional.</p></div>
+      <div><h3>How to evaluate</h3><p>As an MVP in the findings model: one defined question, an accuracy threshold, a decision date.</p></div>
+      <div><h3>Precedent</h3><p>OpenSSF incubating project created in part by Citi — useful in a build-versus-adopt discussion at governance.</p></div>
     </div>
   </section>
 
   <section>
     <div class="sec-head">
       <h2>Open questions</h2>
-      <p>Answers to these change the plan rather than its sequence. Worth resolving before the Next phase starts.</p>
+      <p>Reduced and re-pointed. These now determine the shape of the plan rather than whether it can start.</p>
     </div>
     <div class="seams">
-      <div class="seamcard"><span class="id">Q1</span><h3>Jenkins topology</h3><p>One controller or many? Shared agents or per-team? The answer sets how many builder identities the trust register needs and how far the L2 work has to be replicated.</p></div>
-      <div class="seamcard"><span class="id">Q2</span><h3>What "mixed / other" CI actually covers</h3><p>Every non-Jenkins builder needs assessing or defaults to L0. The size of that population determines whether it is a migration or an exception register.</p></div>
-      <div class="seamcard"><span class="id">Q3</span><h3>Signing key custody</h3><p>Which HSM or KMS, and who operates it. This is the long-lead item on the whole route — start the conversation before the L2 design, not after.</p></div>
-      <div class="seamcard"><span class="id">Q4</span><h3>Jar or image as the unit of deployment</h3><p>If most Java ships as container images, the container path's tooling applies and attestations ride on OCI referrers. If jars deploy directly to VMs, a second mechanism is needed.</p></div>
-      <div class="seamcard"><span class="id">Q5</span><h3>Who operates the verification service</h3><p>It issues VSAs and gates promotion, so it is production infrastructure with an availability requirement. An AppSec-operated service and a platform-operated one have different funding conversations.</p></div>
-      <div class="seamcard"><span class="id">Q6</span><h3>Existing scanner output formats</h3><p>Whether current SAST and SCA tooling can emit or be wrapped to emit attestations determines how much of the Next phase is integration work versus tooling change.</p></div>
+      <div class="seamcard"><span class="id">Q1</span><h3>Does the agent generate or sign?</h3><p>The single most consequential question on this route. It decides whether L2 is a verification exercise or an engineering one.</p></div>
+      <div class="seamcard"><span class="id">Q2</span><h3>How are signing callers authenticated?</h3><p>Per-build workload identity or a shared secret available in the job. The second means any job can obtain a signature for any artefact.</p></div>
+      <div class="seamcard"><span class="id">Q3</span><h3>What proportion of builds go through DevX?</h3><p>Everything outside it defaults to L0. This number sets whether unorchestrated builds are an exception register or a migration programme.</p></div>
+      <div class="seamcard"><span class="id">Q4</span><h3>Which executor classes exist?</h3><p>The trust register needs one entry per class with distinct security attributes. Ephemeral versus shared is the distinction that matters most.</p></div>
+      <div class="seamcard"><span class="id">Q5</span><h3>Does the SBOM inventory key to digests?</h3><p>If stage SBOMs are keyed to build numbers or versions rather than artefact digests, reconciliation and advisory matching both become unreliable.</p></div>
+      <div class="seamcard"><span class="id">Q6</span><h3>Who operates the verification service?</h3><p>It gates promotion, so it carries an availability requirement. AppSec-operated and platform-operated imply different funding conversations.</p></div>
     </div>
   </section>
 
 </div><!-- /layer-javaroute -->
 
 <footer>
-  <p>Document v10 — adds the practical Java application route: current state, target state and the path between them. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v11 — revises the Java route for the DevX orchestration layer, the SLSA signing agent and the SBOM inventory. v10 added the practical Java application route. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
