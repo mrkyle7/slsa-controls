@@ -225,7 +225,7 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-javaroute" data-layer="javaroute" aria-controls="layer-javaroute" aria-selected="false">Java route (practical)</button>
   <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v11</span>
+  <span class="vpill">v12</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -626,6 +626,87 @@ footer p{font-size:.8rem}
     <div><h3>Route out under pressure</h3><p>An ungated production service needing a hotfix for something sitting in protected is the first real incident with this design. The emergency waiver path must admit it on a short fuse, or teams will route around the registry.</p></div>
     <div><h3>Pull telemetry as a proxy</h3><p>Where deployment is ungated, registry pull events give an approximate digest-to-environment map. Weaker than admission control — a pull is not a run — but often the fastest route to a blast-radius answer for the ungated estate.</p></div>
     <div><h3>Coverage is the headline metric</h3><p>Percentage of the production estate on gated deployment, by risk tier, with "would have blocked" counts published for the remainder. That number justifies the investment and answers the regulator better than silence about the gap.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>The waived release, end to end</h2>
+    <p>The case that decides whether this control is seen as a tax or as infrastructure: an artefact with an open finding that has to ship anyway. This is where the evidence chain stops being paperwork and starts being the thing that lets the release happen.</p>
+  </div>
+
+  <p style="font-size:.92rem"><strong>The argument in one line: a verified chain is what makes a narrow, fast waiver possible.</strong> Without provenance and an SBOM bound to a digest, an approver cannot tell which artefact they are waiving, what is in it, or whether the problem is even reachable — so the only available decisions are to block the release or to grant something broad and open-ended. Broad waivers are the real risk, and they are what teams are forced into when the evidence is missing.</p>
+
+  <div class="clock">
+    <div class="clock-row"><div class="t">1 · Finding</div><div class="d"><h3>Promotion gate raises a real issue</h3><p>The SBOM names the exact component and version, not "something in this app". The team knows in seconds what they are dealing with, and so does the approver.</p></div></div>
+    <div class="clock-row"><div class="t">2 · Triage</div><div class="d"><h3>Exploitability, not severity</h3><p>KEV, EPSS and reachability feed an SSVC decision. Most findings resolve here as <code>not_affected</code> with a justification and never become a waiver at all — which is the cheapest possible outcome for everyone.</p></div></div>
+    <div class="clock-row"><div class="t">3 · Waiver</div><div class="d"><h3>Narrow because it can be</h3><p>Scoped to this digest, this environment, with an expiry and a named owner. That precision is only possible because the digest is a meaningful identity. Approval is proportionate to the SSVC outcome rather than to the CVSS number.</p></div></div>
+    <div class="clock-row"><div class="t">4 · Attestation</div><div class="d"><h3>Signed, not ticketed</h3><p>The waiver is an attestation bound to the digest, so it is machine-readable at every subsequent gate. Nobody has to remember it, look it up, or be on shift for it.</p></div></div>
+    <div class="clock-row"><div class="t">5 · Verification</div><div class="d"><h3>One VSA, evidence included</h3><p>The verification service evaluates provenance, SBOM, scan attestations and the waiver together, and issues a single verification summary recording the build level and the policy applied. The release is authorised with the exception inside it, not despite it.</p></div></div>
+    <div class="clock-row"><div class="t">6 · Deploy</div><div class="d"><h3>Ships without human intervention at the gate</h3><p>Admission verifies the VSA and the artefact runs. On platforms that cannot verify, the released repository path carries the same decision. The waiver travels with the artefact — no gate needs a person in it.</p></div></div>
+    <div class="clock-row"><div class="t">7 · Expiry</div><div class="d"><h3>Enforcement without chasing</h3><p>When the waiver expires the verification result goes stale and the next evaluation fails. The deadline enforces itself. No one maintains a spreadsheet, and no one has to be the person who chases another team.</p></div></div>
+    
+    <div class="clock-row"><div class="t">8 · Fix</div><div class="d"><h3>The exception dies with the artefact</h3><p>Remediation produces a new digest with its own clean VSA. The old waiver was bound to the old digest and simply stops being relevant. Nothing to close, nothing to tidy up.</p></div></div>
+  </div>
+
+  <div class="note">
+    <p><strong>Compare the same release without the chain.</strong> The approver cannot identify the artefact, so the waiver is written against a CVE and an application name. It cannot expire meaningfully, because nothing detects the artefact changing. It cannot be verified at deploy, so someone has to remember it at the gate. And when the next release of the same app ships with a different problem, the old waiver is still sitting there covering it. Every one of those is worse for the team, not just for AppSec.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <h2>What being on the path earns you</h2>
+    <p>The control has to give something back at each level, and the something has to be worth having. These are entitlements, not compliance ratings.</p>
+  </div>
+  <div class="scroller">
+  <table>
+    <caption>Evidence level and what it unlocks. The differences are deliberately large enough to be worth the engineering.</caption>
+    <thead><tr><th scope="col">Evidence level</th><th scope="col">Where you can deploy</th><th scope="col">Waivers</th><th scope="col">Emergency releases</th><th scope="col">Triage burden</th></tr></thead>
+    <tbody>
+      <tr>
+        <th scope="row">Unorchestrated<span>No provenance</span></th>
+        <td class="gapc">Protected path only; not production</td>
+        <td class="gapc">Manual review by the control owner, every time</td>
+        <td class="gapc">No fast path — nothing to verify against</td>
+        <td class="gapc">Every finding triaged by hand</td>
+      </tr>
+      <tr>
+        <th scope="row">Build L1<span>Provenance exists</span></th>
+        <td class="seam">Standard path for non-production</td>
+        <td class="seam">Full review; scope cannot be narrowed to a digest reliably</td>
+        <td class="seam">Case by case</td>
+        <td class="seam">Some automation possible</td>
+      </tr>
+      <tr>
+        <th scope="row">Build L2<span>Authentic provenance</span></th>
+        <td class="live">Production eligible on all platform types</td>
+        <td class="live">Self-service within budget for SSVC Track and Track*; digest-scoped and auto-expiring</td>
+        <td class="live">Pre-approved same-day path</td>
+        <td class="live">VEX suppression honoured automatically — most findings never reach a human</td>
+      </tr>
+      <tr>
+        <th scope="row">Build L3<span>Hardened build</span></th>
+        <td class="live">Tier-one eligible</td>
+        <td class="live">Longest permitted durations, lightest ceremony</td>
+        <td class="live">Fastest route, minimal approval</td>
+        <td class="live">Reachability evidence accepted as justification</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="base" style="margin-top:16px">
+    <div><h3>Incident response stops being archaeology</h3><p>"Are we exposed to this?" answered from the inventory in minutes rather than by a week of asking teams. The people who benefit most are the ones who currently get pulled into those calls at 9pm.</p></div>
+    <div><h3>Precise recall instead of rebuild everything</h3><p>When a dependency or a builder turns out to be compromised, provenance tells you exactly which builds are affected. The alternative is rebuilding and redeploying the estate on suspicion.</p></div>
+    <div><h3>Smaller queues, not bigger ones</h3><p>Reachability and VEX only work when evidence binds to an artefact. Teams on the path see a fraction of the findings, because the rest are resolved without them.</p></div>
+    <div><h3>Audit evidence as a by-product</h3><p>The chain is the evidence. No pre-review scramble to assemble what was deployed, when, and who approved it.</p></div>
+    <div><h3>Deploy anywhere</h3><p>A verified artefact moves through the standard path to every platform type. Unverified artefacts are confined — the restriction lands on the artefact, not on the team's calendar.</p></div>
+    <div><h3>Fewer conversations with us</h3><p>Worth saying plainly, because it is the benefit teams actually value: the better the evidence, the less often AppSec needs to be in the room.</p></div>
+  </div>
+
+  <div class="note">
+    <p><strong>How to present this.</strong> Lead with the waived release, not with the levels. Every team has had a release held up by a finding they believed was not exploitable, and every team has written a waiver they knew was broader than it should have been. The chain is what makes the narrow version possible and fast. The SLSA levels are the mechanism; the entitlements are the reason anyone would choose to do it. A control that only ever says no gets routed around, and it deserves to be.</p>
   </div>
 </section>
 
@@ -2039,7 +2120,7 @@ footer p{font-size:.8rem}
 </div><!-- /layer-javaroute -->
 
 <footer>
-  <p>Document v11 — revises the Java route for the DevX orchestration layer, the SLSA signing agent and the SBOM inventory. v10 added the practical Java application route. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v12 — adds the waived release chain and the entitlements model: what teams get back for being on the path. v11 revised the Java route for the DevX orchestration layer, the SLSA signing agent and the SBOM inventory. v10 added the practical Java application route. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
