@@ -190,6 +190,28 @@ footer p{font-size:.8rem}
 .keyrow{display:flex;flex-wrap:wrap;gap:8px 16px;margin:14px 0 0;font-size:.8rem;color:var(--ink-soft)}
 .keyrow span{display:flex;align-items:center;gap:6px}
 .keyrow i{width:11px;height:11px;border-radius:2px;display:block}
+/* golden path journey */
+.journey{position:relative;margin-top:8px}
+.jstep{display:grid;grid-template-columns:44px 1fr;gap:0;position:relative}
+.jrail{position:relative}
+.jrail::before{content:"";position:absolute;left:17px;top:0;bottom:0;width:2px;background:var(--rule)}
+.jstep:first-child .jrail::before{top:18px}
+.jstep:last-child .jrail::before{bottom:auto;height:18px}
+.jnum{position:relative;z-index:1;width:26px;height:26px;border-radius:50%;background:var(--spine);color:var(--paper);
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;display:flex;align-items:center;justify-content:center;margin:8px 0 0 4px}
+.jstep.block .jnum{background:var(--gap)}
+.jstep.gate .jnum{background:var(--seam);color:#1b1305}
+.jbody{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:13px 14px;margin:0 0 12px 8px}
+.jbody h3{font-size:.98rem;margin:0}
+.jsys{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-soft);display:block;margin-bottom:3px}
+.jbody p{font-size:.86rem;color:var(--ink-soft);margin:.4rem 0 0;max-width:none}
+.jev{margin-top:.7rem;padding-top:.6rem;border-top:1px dashed var(--rule);display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.jev b{font-size:.72rem;font-weight:600;color:var(--ink);margin-right:2px}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:.66rem;border:1px solid var(--rule);border-radius:2px;padding:1px 6px;color:var(--ink-soft)}
+.chip.add{border-color:var(--live);background:var(--live-bg);color:var(--live)}
+.chip.chk{border-color:var(--build);background:var(--build-bg);color:var(--build)}
+.jfail{margin-top:.55rem;font-size:.8rem;color:var(--gap)}
+.jfail b{font-weight:600}
 </style>
 </head>
 <body>
@@ -223,9 +245,10 @@ footer p{font-size:.8rem}
   <button role="tab" id="tab-source" data-layer="source" aria-controls="layer-source" aria-selected="false">Source &amp; forks</button>
   <button role="tab" id="tab-desktop" data-layer="desktop" aria-controls="layer-desktop" aria-selected="false">SDKs, IDEs &amp; plugins</button>
   <button role="tab" id="tab-javaroute" data-layer="javaroute" aria-controls="layer-javaroute" aria-selected="false">Java route (practical)</button>
+  <button role="tab" id="tab-journey" data-layer="journey" aria-controls="layer-journey" aria-selected="false">Golden path journey</button>
   <button role="tab" id="tab-findings" data-layer="findings" aria-controls="layer-findings" aria-selected="false">Risk findings</button>
   <button role="tab" disabled title="Planned">Stages (planned)</button>
-  <span class="vpill">v12</span>
+  <span class="vpill">v13</span>
 </nav>
 
 <div class="layer" id="layer-base" data-layer="base" role="tabpanel" aria-labelledby="tab-base">
@@ -2119,8 +2142,71 @@ footer p{font-size:.8rem}
 
 </div><!-- /layer-javaroute -->
 
+
+<div class="layer" id="layer-journey" data-layer="journey" role="tabpanel" aria-labelledby="tab-journey" hidden>
+
+  <section style="margin-top:28px">
+    <div class="sec-head">
+      <h2>Golden path journey</h2>
+      <p>One dependency carrying a CVSS 9+ CVE, traced from the moment it is blocked at ingress to the moment its waiver is revoked in production. Every step names the system, what evidence it adds or checks, and the condition that breaks it.</p>
+    </div>
+    <p style="font-size:.92rem">The thing to notice across the twelve steps: <strong>the evidence bundle grows and nothing is ever re-established</strong>. The waiver granted at ingress without context is upgraded at build time when context exists, carried through approval, checked at deploy, and re-tested in production. No gate re-asks an earlier question, and none depends on a person remembering an earlier decision.</p>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The journey</h2></div>
+    <div class="journey"><div class="jstep block"><div class="jrail"><div class="jnum">1</div></div><div class="jbody"><span class="jsys">Nexus proxy &middot; ingress policy</span><h3>Dependency blocked automatically</h3><p>A CVSS 9+ advisory exists for the requested version. The proxy refuses the fetch and returns a request route rather than a dead end &mdash; a block with no path forward is what drives people to vendor the jar by hand.</p><div class="jev"><b>Evidence</b><span class="chip add">+ ingress decision record</span></div><p class="jfail"><b>Fails if:</b> the block is silent or offers no route to request an exception.</p></div></div><div class="jstep gate"><div class="jrail"><div class="jnum">2</div></div><div class="jbody"><span class="jsys">Waiver system &middot; SLSA-signed</span><h3>Scoped ingress waiver, status under_investigation</h3><p>A business need is established for named business apps. The waiver is signed and bound to the dependency PURL and hash, scoped to those ICE-registered apps, with an owner and an expiry. Status is <code>under_investigation</code> because at ingress there is no exposure, no data class and no reachability &mdash; not enough context to make a risk decision, only enough to authorise controlled use.</p><div class="jev"><b>Evidence</b><span class="chip add">+ ingress waiver attestation (signed)</span></div><p class="jfail"><b>Fails if:</b> the waiver is written against the CVE alone with no app scope, expiry or owner &mdash; at which point it covers everything, forever.</p></div></div><div class="jstep "><div class="jrail"><div class="jnum">3</div></div><div class="jbody"><span class="jsys">Nexus &middot; ICE-driven entitlement</span><h3>Local download restricted to linked developers</h3><p>Resolution of that PURL is permitted only for identities ICE links to the in-scope business apps. Everyone else gets the block from step 1. The proxy must therefore authenticate developers individually rather than accepting a shared build credential.</p><div class="jev"><b>Evidence</b><span class="chip chk">&#10003; ICE membership</span></div><p class="jfail"><b>Fails if:</b> the proxy cannot identify the requester, in which case the entitlement is advisory and the scope is fiction.</p></div></div><div class="jstep gate"><div class="jrail"><div class="jnum">4</div></div><div class="jbody"><span class="jsys">Golden path CI &middot; ICE component binding</span><h3>Build-time resolution authorised per component</h3><p>The pipeline requests the dependency on behalf of a component registered in ICE, and the proxy authorises against the waiver scope for that component rather than for the pipeline or the team. This must apply to transitive resolution too &mdash; the dependency arriving four levels down into an out-of-scope component is the same exposure with none of the visibility.</p><div class="jev"><b>Evidence</b><span class="chip chk">&#10003; waiver scope vs ICE component</span></div><p class="jfail"><b>Fails if:</b> resolution is authorised at pipeline level, or transitive pulls bypass the scope check.</p></div></div><div class="jstep gate"><div class="jrail"><div class="jnum">5</div></div><div class="jbody"><span class="jsys">Exploitability engine &larr; CI context</span><h3>Context arrives, and the decision becomes possible</h3><p>CI supplies what ingress never had: which component, which business app, exposure, data classification, criticality. The engine combines that with KEV, EPSS and reachability to produce an SSVC outcome, which flows back into the waiver system. The record moves off <code>under_investigation</code> to either a justified <code>not_affected</code> or an <code>affected</code> waiver carrying additional approvals proportionate to the outcome.</p><div class="jev"><b>Evidence</b><span class="chip add">+ exploitability verdict</span><span class="chip add">+ VEX statement</span><span class="chip add">+ approval record</span></div><p class="jfail"><b>Fails if:</b> the engine is consulted but its verdict is not written back, leaving the waiver permanently under investigation.</p></div></div><div class="jstep "><div class="jrail"><div class="jnum">6</div></div><div class="jbody"><span class="jsys">Golden path CI &middot; signing agent</span><h3>Provenance generated and signed</h3><p>SLSA provenance for the built component, with the dependency in its resolved dependencies and the waiver identifiers referenced. Generated from dispatch facts by the platform and signed by the agent, not composed by the build.</p><div class="jev"><b>Evidence</b><span class="chip add">+ SLSA provenance (signed)</span><span class="chip add">+ scan attestations</span></div><p class="jfail"><b>Fails if:</b> the build composes its own provenance, which makes every downstream check a verification of the build&rsquo;s own claims.</p></div></div><div class="jstep "><div class="jrail"><div class="jnum">7</div></div><div class="jbody"><span class="jsys">Spectra &middot; SBOM inventory</span><h3>SBOM generated and stored</h3><p>CycloneDX SBOM from the resolved graph, emitted pre-shade and keyed to the artefact digest, sent to Spectra. This is the record every future advisory is matched against, long after the release is forgotten.</p><div class="jev"><b>Evidence</b><span class="chip add">+ SBOM in Spectra</span></div><p class="jfail"><b>Fails if:</b> the SBOM is keyed to a build number or version string instead of the digest, breaking reconciliation and advisory matching.</p></div></div><div class="jstep "><div class="jrail"><div class="jnum">8</div></div><div class="jbody"><span class="jsys">Change management &middot; PURL-anchored</span><h3>Change record created against the artefact</h3><p>The change record points at the artefact PURL, which links to the provenance, the ICE component and the waiver. The change is anchored to a specific artefact rather than to a description of one.</p><div class="jev"><b>Evidence</b><span class="chip add">+ change record</span><span class="chip chk">&#10003; ICE component link</span></div><p class="jfail"><b>Fails if:</b> the change references a version string, so nothing connects the approval to the thing that ships.</p></div></div><div class="jstep gate"><div class="jrail"><div class="jnum">9</div></div><div class="jbody"><span class="jsys">Release page</span><h3>Approval on the evidence, bound to the digest</h3><p>The approver sees provenance and build level, scan results, the waiver with its scope, expiry and approvals, the SBOM link and the change record, in one place. Approval binds to the digest, so approving is an act about a specific artefact.</p><div class="jev"><b>Evidence</b><span class="chip add">+ release approval (digest-bound)</span><span class="chip chk">&#10003; full evidence bundle</span></div><p class="jfail"><b>Fails if:</b> approval binds to a branch, a version or a release name, leaving a substitution gap between approval and deploy.</p></div></div><div class="jstep gate"><div class="jrail"><div class="jnum">10</div></div><div class="jbody"><span class="jsys">Deployment service</span><h3>Deploys only on a matching signature</h3><p>The service verifies the provenance signature and that its subject digest equals the checksum of the artefact about to be deployed. No match, no deploy. Verifying a VSA issued at promotion is the better long-term shape than re-verifying raw provenance on every deployment, but the property enforced is the same.</p><div class="jev"><b>Evidence</b><span class="chip chk">&#10003; signature</span><span class="chip chk">&#10003; subject digest = artefact checksum</span><span class="chip chk">&#10003; waiver still valid</span></div><p class="jfail"><b>Fails if:</b> the digest is taken from the deployment request rather than computed from the artefact.</p></div></div><div class="jstep "><div class="jrail"><div class="jnum">11</div></div><div class="jbody"><span class="jsys">Production dynamic inventory &rarr; Spectra</span><h3>What is actually running becomes queryable</h3><p>The running artefact is registered with its checksum and a link to its provenance, and runtime SBOMs are generated periodically back into Spectra. This is the step that closes the digest-to-instance gap and makes blast radius answerable in minutes.</p><div class="jev"><b>Evidence</b><span class="chip add">+ runtime instance record</span><span class="chip add">+ periodic runtime SBOM</span></div><p class="jfail"><b>Fails if:</b> inventory records an application name rather than a digest, which leaves the blast-radius query exactly where it started.</p></div></div><div class="jstep block"><div class="jrail"><div class="jnum">12</div></div><div class="jbody"><span class="jsys">External revalidation process</span><h3>The waiver is re-tested, not just aged</h3><p>Periodically the CVE is re-assessed against the waiver: has exploitation been observed, has EPSS moved, has upstream released a fix, has the exposure changed. Any of these can revoke the waiver or raise an alert. Revocation invalidates the verification result, so the next deployment or re-verification fails and the fix stops being optional.</p><div class="jev"><b>Evidence</b><span class="chip chk">&#10003; KEV / EPSS movement</span><span class="chip chk">&#10003; upstream fix availability</span><span class="chip chk">&#10003; exposure change</span></div><p class="jfail"><b>Fails if:</b> revocation has no defined action for already-running instances &mdash; decide in advance whether it alerts, blocks redeployment, or escalates.</p></div></div></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>What the bundle looks like at the gate</h2>
+      <p>By step 10 the deployment service is checking one coherent set, all bound to the same digest.</p>
+    </div>
+    <div class="base">
+      <div><h3>Identity</h3><p>Artefact digest, PURL, ICE component and business app. Everything else attaches to these.</p></div>
+      <div><h3>Build evidence</h3><p>Signed SLSA provenance naming builder and executor class, resolved dependencies including the CVE-bearing one, and the build level claimed.</p></div>
+      <div><h3>Composition</h3><p>SBOM in Spectra, keyed to the digest and retained beyond the artefact&rsquo;s life.</p></div>
+      <div><h3>Assessment</h3><p>Scan attestations, the exploitability verdict, and the VEX statement recording why this instance is or is not affected.</p></div>
+      <div><h3>Exception</h3><p>The waiver: scope, owner, expiry, approvals, and the SSVC outcome that set the approval tier.</p></div>
+      <div><h3>Authorisation</h3><p>Change record and release approval, both bound to the digest rather than to a name or a version.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Spectra and GUAC</h2>
+      <p>They do different jobs, and Spectra is the one that has to exist.</p>
+    </div>
+    <div class="base">
+      <div><h3>Spectra is the system of record</h3><p>Documents keyed to digests, retained as long as the evidence is needed, fed by build and by the runtime inventory. Authoritative, and the thing an auditor is ultimately pointed at.</p></div>
+      <div><h3>GUAC is a query layer</h3><p>It ingests SBOMs, in-toto and SLSA attestations, VEX and advisory data into a graph and answers traversal questions: transitive blast radius, artefact lineage, which components share an affected dependency. An index over documents, not a replacement store.</p></div>
+      <div><h3>So they compose</h3><p>Spectra feeds GUAC; GUAC does not replace Spectra. The real question is whether Spectra grows graph query capability or whether a graph layer sits over it.</p></div>
+      <div><h3>The deciding input</h3><p class="seam">The production dynamic inventory. GUAC ingests documents rather than live inventory feeds, so linking digest to running instance is bespoke integration either way. Whichever system holds that link is the one that can actually answer blast radius.</p></div>
+      <div><h3>What GUAC would need from this journey</h3><p>SBOMs from Spectra, the signed provenance, the VEX statements from the exploitability engine, and the waiver attestations. All four already exist as documents in this design, which makes the evaluation cheap.</p></div>
+      <div><h3>How to decide</h3><p>Run it as an MVP with one question it must answer better than Spectra alone &mdash; transitive blast radius across the estate is the obvious candidate &mdash; with an accuracy threshold and a decision date.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Design points worth settling early</h2>
+      <p>Each is a place where the journey works on a slide but needs a decision to work in practice.</p>
+    </div>
+    <div class="seams">
+      <div class="seamcard"><span class="id">J1</span><h3>Transitive scope enforcement</h3><p>The waiver is scoped to business apps, but dependencies arrive transitively. An in-scope component pulling it directly is intended; an out-of-scope component acquiring it four levels down is the same exposure with none of the approval.</p><p class="owner">Decide: does scope apply to direct declaration, or to presence in the resolved graph? The second is correct and harder.</p></div>
+      <div class="seamcard"><span class="id">J2</span><h3>Developer identity at the proxy</h3><p>Step 3 needs per-developer authentication to Nexus. Shared credentials or unauthenticated group repositories make the entitlement unenforceable.</p><p class="owner">Decide the identity model before promising scoped local access.</p></div>
+      <div class="seamcard"><span class="id">J3</span><h3>The under_investigation window</h3><p>Between steps 2 and 5, teams can build with a critical CVE before any exploitability assessment exists. Acceptable only if promotion is genuinely blocked until the verdict lands.</p><p class="owner">Decide the maximum window, and what happens when it expires with no verdict.</p></div>
+      <div class="seamcard"><span class="id">J4</span><h3>Revocation blast action</h3><p>Step 12 can revoke a waiver for something already running. Alerting, blocking redeployment and forcing rollback are very different commitments.</p><p class="owner">Decide per SSVC outcome in advance, and write it into the waiver terms so the team knows what they accepted.</p></div>
+      <div class="seamcard"><span class="id">J5</span><h3>VSA versus raw provenance at deploy</h3><p>Checking raw provenance on every deployment duplicates policy logic into the deployment service. Issuing a VSA at promotion keeps policy in one place.</p><p class="owner">Decide now &mdash; retrofitting means changing the deployment service, which is the hardest component to change later.</p></div>
+      <div class="seamcard"><span class="id">J6</span><h3>Fix availability closes the waiver</h3><p>The strongest revocation trigger is upstream publishing a fixed version. Without it, waivers outlive their justification silently.</p><p class="owner">Wire fix availability into step 12 explicitly rather than relying on expiry alone.</p></div>
+    </div>
+  </section>
+
+</div><!-- /layer-journey -->
+
 <footer>
-  <p>Document v12 — adds the waived release chain and the entitlements model: what teams get back for being on the path. v11 revised the Java route for the DevX orchestration layer, the SLSA signing agent and the SBOM inventory. v10 added the practical Java application route. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
+  <p>Document v13 — adds the golden path journey: a CVSS 9+ dependency traced end to end through ICE, the exploitability engine, Spectra and the deployment service. v12 added the waived release chain and the entitlements model. v11 revised the Java route for the DevX orchestration layer, the SLSA signing agent and the SBOM inventory. v10 added the practical Java application route. v9 expanded the SDK treatment to cover the desktop install as a first-class artefact. v8 added the developer desktop layer: SDKs, toolchains, IDEs and IDE plugins. v7 added the risk findings treatment model with the agent-skills worked example. v6 added the harvested source and fork path layer, including the contribute-back route. v5 added the vendor binary and freeware/shareware path layers. v4 added the container path layer. v3 split the FOSS path into per-ecosystem layers (Java, Python, npm, Go) alongside a FOSS overview. v2 added the FOSS path as a single layer; v1 is the control overview alone. Draft skeleton for review; control IDs are placeholders pending mapping to the AppSec control library. SLSA references are to v1.2 (approved 24 November 2025); Build Environment and Dependency tracks are working drafts and will change. Platform level claims are vendor-asserted rather than independently certified.</p>
 </footer>
 
 </div>
